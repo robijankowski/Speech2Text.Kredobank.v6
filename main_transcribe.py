@@ -1,0 +1,234 @@
+import os
+from datetime import datetime, date
+import logging
+import json
+from dataclasses import asdict
+
+from core.config import settings
+from openai_tools.openai_client_transcribe import Transcription
+from transcribe.core.tr_config import tr_settings
+
+from core.logger import setup_logger, shutdown_logger, LogConfig
+log_config = LogConfig(
+    log_dir=settings.TRANSCRIBE_LOGS_DIR,
+    base_filename=settings.TRANSCRIBE_LOGS_PREF,
+    level=logging.DEBUG,
+    logger_name=tr_settings.TR_LOGGER_NAME
+)
+log = setup_logger(log_config)
+
+
+from transcribe.utilities.scenario_tools import split_transcription_into_roles_4o, format_scenario_md, consolidate_dialogue, detect_speaker_roles, add_prefix_to_sentences
+from transcribe.utilities.md_creator import create_documentation_md
+from transcribe.utilities.summary_tools import generate_crm_summary_o4, format_summary_md
+from transcribe.utilities.evaluate_tools import evaluate_call, format_evaluation_results_md, format_evaluation_results
+from transcribe.utilities.audio_tools import prepare_audio_for_transcription
+from transcribe.utilities.stats import get_stats, stats_json_to_csv_text, stats_save_json_to_csv, clean_file_names
+from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_stereo, transcript_audio_file_verbose_o4_single_channel
+from transcribe.utilities.evaluation_engine import load_scheme, run_scheme
+from transcribe.utilities.evaluation_engine_regs import load_active_scheme
+
+AUDIO_FILES = [
+    "AUTO-2025-06-30-09-05-380963799218-1096-1751263515.1528148-stereo1.wav",
+    "AUTO-2025-06-30-10-08-380988442847-1087-1751267274.1529139-stereo1.wav",
+    "AUTO-2025-06-30-10-17-380639093150-1006-1751267854.1529303-stereo1.wav",
+    "AUTO-2025-06-30-12-05-380990805468-1098-1751274275.1530761-stereo1.wav",
+    "OUT-2025-06-30-09-34-1099-0500814269-1751265256.1528626-stereo1.wav" 
+]
+
+O4_METADATA = [
+    "Імена учасників: 'Іволо Олена Володимирівна', Ім'я агента: 'Уляна'; Назва банку: 'KredoBank Україна'",
+    "Імена учасників: 'Лукашчук Сергій Миколаївич', Ім'я агента: 'Святослав'; Назва банку: 'KredoBank Україна'",
+    "",
+    "Ім'я агента: 'Іванна'; Назва банку: 'KredoBank Україна'",
+    ""
+]
+
+WHISPER_METADATA = [
+    "Іволо Олена Володимирівна, Уляна, KredoBank, Україна",
+    "'Лукашчук Сергій Миколаївич', 'Святослав', KredoBank, Україна",
+    "",
+    "'Іванна', KredoBank, Україна",
+    ""
+]
+
+
+
+conversation_test_text = """
+AG: Алло, добрий день.
+CL: Алло, доброго дня. Скажіть, будь ласка, що це мені приходить, що в мене якась заборгованість?
+AG: Зрозуміла. Це Іволо Олена Володимирівна, так?
+CL: Так.
+AG: Давайте я також представлюся. Мене звати Уляна, мій порядковий номер 1096, повідомляю, що наша розмова записується. По вашому рахунку виник від'ємний баланс на суму 8 гривень і 20 копійок.
+CL: А я вже поповняла.
+AG: Ви вже поповнили?
+CL: Поповняла, так.
+AG: Коли ви оплачували?
+CL: Давненько трошки, точно не скажу. Ну, може місяць пройшов.
+AG: Добре, давайте зараз я перегляну. Так, дякую за очікування. Я бачу, що у вас є арешт рахунки. Ви про це знаєте?
+CL: Ні. Який арешт? На яку суму?
+AG: У вас є арешт рахунки і потрібно звернутися у виконавчу службу, щоб...
+CL: Мені приходить, що арешт знятий, бо в мене пару банків є мобільних додатків. Блокують, розблоковують, блокують, розблоковують.
+AG: Я бачу, що в нас є арешт рахунків.
+CL: На яку суму?
+AG: Я не маю таких данів, не можу вам сказати. І тому у вас не виходить оплатити від'ємний баланс по рахунку, тому що є арешт рахунку.
+CL: Добре. Дякую.
+AG: Гарного вам дня, до побачення.
+CL: До побачення.
+"""
+
+
+conv_eval_res = {
+  "system_code": "kcc",
+  "scheme_name": "KredoBank Collection Calls (example scheme)",
+  "scheme_version": "1.0.0",
+  "model": "gpt-4o",
+  "total_weighted_score": 11.0,
+  "total_weighted_max": 30.0,
+  "details": [
+    {
+      "id": "opening_and_verification",
+      "desc": "Opening + recording disclosure + identity verification quality",
+      "score": 5,
+      "max_points": 15,
+      "weight": 1.0,
+      "weighted_score": 5.0,
+      "weighted_max": 15.0,
+      "model": "gpt-4o",
+      "raw": {
+        "score": 11
+      }
+    }
+  ],
+  "score_percent": 36.67
+}
+
+
+error_res = {
+  "system_code": "kcc",
+  "scheme_name": "KredoBank Collection Calls (example scheme)",
+  "scheme_version": "1.0.0",
+  "model": "gpt-4o",
+  "total_weighted_score": 5.0,
+  "total_weighted_max": 30.0,
+  "details": [
+    {
+      "id": "opening_and_verification",
+      "desc": "Opening + recording disclosure + identity verification quality",
+      "score": 5,
+      "max_points": 15,
+      "weight": 1.0,
+      "weighted_score": 5.0,
+      "weighted_max": 15.0,
+      "model": "gpt-4o",
+      "raw": {
+        "score": 11
+      }
+    },
+    {
+      "id": "clarity_and_accuracy",
+      "desc": "Clarity and accuracy of communication (figures, dates, terms, logical flow)",
+      "score": 0,
+      "max_points": 15,
+      "weight": 1.0,
+      "weighted_score": 0.0,
+      "weighted_max": 15.0,
+      "model": "gpt-4o",
+      "status": "error",
+      "error": "Test exception for debugging"
+    }
+  ],
+  "score_percent": 16.67
+}
+
+
+def run_transcription(start_index=0, end_index=None):
+    # Create timestamp for this run
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Create transcriptions directory if it doesn't exist
+    transcriptions_dir = "./test/transcriptions"
+    os.makedirs(transcriptions_dir, exist_ok=True)
+    
+    try:
+
+
+
+        
+
+        file_number = start_index
+        if end_index is None:
+            end_index = len(AUDIO_FILES) - 1
+
+        while file_number <= end_index:
+            audio_file = "./test/sources/" + AUDIO_FILES[file_number]
+            metadata_text = O4_METADATA[file_number]
+
+            log.info(f"\n\nStereo WAV File Splitter and Transcription Tool - FILE NUMBER: {file_number}")
+            log.info("=" * 60)
+
+            l_file_cleaned, r_file_cleaned, s_file_cleaned = prepare_audio_for_transcription(audio_file, 
+                                                                                             tr_settings.TR_TEMP_ROOT_DIR)
+
+            if l_file_cleaned and r_file_cleaned:
+                log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned left channel wav " + "="*30)
+                o4_left_trans = transcript_audio_file_verbose_o4_single_channel(l_file_cleaned, metadata_text)
+                log.info(f"\n{o4_left_trans.text}")
+
+                log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned right channel wav as " + "="*30)
+                o4_right_trans = transcript_audio_file_verbose_o4_single_channel(r_file_cleaned, metadata_text)
+                log.info(f"\n{o4_right_trans.text}")
+
+                log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned stereo wav " + "="*30)
+                o4_stereo_trans = transcript_audio_file_verbose_o4_stereo(s_file_cleaned, metadata_text)
+                log.info(f"\n{o4_stereo_trans.text}")
+
+
+            log.info("\n\n" + "="*30 + " Detecting speaker roles in transcription " + "="*30)
+            agent_text, client_text = detect_speaker_roles( o4_left_trans.text, o4_right_trans.text )
+            agent_text = add_prefix_to_sentences(agent_text, "AG:")
+            client_text = add_prefix_to_sentences(client_text, "CL:")
+
+            log.info("\n\n" + "="*30 + " Modified AGENT for o4 " + "="*30)
+            log.info("\n" + agent_text.replace("AG:", "\nAG:"))
+            log.info("\n\n" + "="*30 + " Modified CLIENT for o4 " + "="*30)
+            log.info("\n" + client_text.replace("CL:", "\nCL:"))
+
+
+            log.info("\n\n\n" + "="*30 + " Generating roles/scenario with o4 " + "="*30)
+            scenario_granular = split_transcription_into_roles_4o( agent_text = agent_text, 
+                                                                   client_text = client_text, 
+                                                                   stereo_text = o4_stereo_trans.text )
+            scenario = consolidate_dialogue(scenario_granular)
+            log.info("\n" + "="*30 + " o4 consolidated scenario "  + "="*30)
+            log.info("\n" + scenario)
+
+            log.info("\n\n\n" + "="*30 + " Generating summary " + "="*30)
+            summary = generate_crm_summary_o4(scenario)
+            log.info("\n" + summary)
+
+            log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
+            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 5) )
+            log.info(
+                f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
+            )
+            # log.debug(
+            #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+            # )
+
+            log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
+            result, success = run_scheme(transcript_text=scenario, scheme=scheme)
+            log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
+            log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
+
+            
+            file_number += 1
+
+    finally:
+        # Always close the logger and restore stdout
+        shutdown_logger(log)
+
+# Run the main function
+if __name__ == "__main__":
+    # run_transcription(3,3)
+    run_transcription(0,0)  # Change indices to process specific files or ranges

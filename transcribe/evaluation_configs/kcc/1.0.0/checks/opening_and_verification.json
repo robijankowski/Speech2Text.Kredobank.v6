@@ -1,0 +1,12 @@
+{
+  "id": "opening_and_verification",
+  "desc": "Opening + recording disclosure + identity verification quality",
+  "weight": 1.0,
+  "max_points": 15,
+  "temperature": 0.0,
+  "schema_name": "opening_verification_evaluation",
+  "system_prompt_file": "prompts/opening_system.txt",
+  "user_prompt_file": "prompts/opening_user.txt",
+  "response_schema_file": "schemas/score_0_15.schema.json",
+  "result_key": "score"
+}
