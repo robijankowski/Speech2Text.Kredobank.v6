@@ -4,6 +4,8 @@
 *.*.pyc
 *.pyc
 *.conv
+*.wav
+.keys
 logs
 HelpDesk.log
 HelpDesk.log.*
