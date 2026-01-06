@@ -1,7 +1,6 @@
 import aiohttp
 import asyncio
 
-API_KEY = "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"
 
 async def transcribe_audio_aiohttp(audio_file_path, model: str = "whisper-1"):
     url = "https://api.openai.com/v1/audio/transcriptions"

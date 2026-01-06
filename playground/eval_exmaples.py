@@ -1,8 +1,7 @@
 import json
 from openai import OpenAI
 
-openai_client = OpenAI(api_key="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")
-openai_model = "gpt-4o"
+
 
 
 

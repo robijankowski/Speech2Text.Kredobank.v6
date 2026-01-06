@@ -6,11 +6,7 @@ from typing import Dict, Any, Optional
 
 
 
-OPENAI_API_KEY = "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"
-OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
-openai_client = OpenAI(api_key="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")
-openai_model = "gpt-4o"
 
 
 

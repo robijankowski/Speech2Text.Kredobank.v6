@@ -6,7 +6,6 @@ from utilities.whisper_correctors_utilities import split_transcription_into_role
 from utilities.whisper_correctors_utilities import find_unclear_words, transcript_audio_file
 
 # Create an api client
-client = OpenAI(api_key="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")
 
 
 AUDIO_FILES = [

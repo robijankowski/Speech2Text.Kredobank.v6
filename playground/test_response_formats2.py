@@ -6,9 +6,6 @@ from typing import Dict, Any, Optional
 
 
 
-OPENAI_API_KEY = "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"
-OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-
 
 transcript_text = """
 Robert is a software engineer with over 10 years of experience in the tech industry. 
