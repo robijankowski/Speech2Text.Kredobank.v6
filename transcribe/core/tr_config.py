@@ -17,6 +17,9 @@ class AppSettings(BaseSettings):
 
     TR_EVALUATION_CONFIGS_ROOT: str
 
+    TR_ANALYSIS_PARALLEL_REQUESTS: int
+    
+
     class Config:
         env_prefix = ""  # Since variable names are unique, we don't need a prefix
         # Pydantic automatically uses environment variables if available

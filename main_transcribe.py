@@ -3,6 +3,8 @@ from datetime import datetime, date
 import logging
 import json
 from dataclasses import asdict
+import asyncio
+from unittest import result
 
 from core.config import settings
 from openai_tools.openai_client_transcribe import Transcription
@@ -28,7 +30,7 @@ from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose
 from transcribe.utilities.evaluation_engine import load_scheme, run_scheme
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme
 from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md
-
+from transcribe.utilities.call_analysis_engine import analyze_transcription_questions
 
 AUDIO_FILES = [
     "AUTO-2025-06-30-09-05-380963799218-1096-1751263515.1528148-stereo1.wav",
@@ -144,6 +146,44 @@ error_res = {
 }
 
 
+SAMPLE_REQUEST_JSON = r'''{
+  "systemId": "CRM_TEST",
+  "requestId": "REQ-90",
+  "conversation": "AG: Алло, добрий день.\nCL: Алло, доброго дня. Скажіть, будь ласка, що це мені приходить, що в мене якась заборгованість?\nAG: Зрозуміла. Це Іволо Олена Володимирівна, так?\nCL: Так.\nAG: Давайте я також представлюся. Мене звати Уляна, мій порядковий номер 1096, повідомляю, що наша розмова записується. По вашому рахунку виник від'ємний баланс на суму 8 гривень і 20 копійок.\nCL: А я вже поповняла.\nAG: Ви вже поповнили?\nCL: Поповняла, так.\nAG: Коли оплачували?\nCL: Давненько трошки, точно не скажу. Ну, може місяць пройшов.\nAG: Добре, давайте зараз я пригляну. Так, дякую за очікування. Я бачу, що у вас є арешт рахунки. Ви про це знаєте?\nCL: Ні. Який арешт? На яку суму?\nAG: У вас є арешт рахунки і потрібно звернутися у виконавчу службу, щоб...\nCL: Мені приходять смс, що арешт знятий, бо в мене пару банків є мобільних додатків. Блокують, розблоковують, блокують, розблоковують.\nAG: Я бачу, що в нас є арешт рахунків.\nCL: На яку суму?\nAG: Я не маю таких данів, не можу вам сказати. І тому у вас не виходить оплатити від'ємний баланс по рахунку, тому що є арешт рахунків.\nCL: Добре. Дякую.\nAG: Гарного вам дня, до побачення.\nCL: Вам також до побачення.",
+  "callbackEndpoint": "http://127.0.0.1:8002/api/questions/answers",
+  "mode": "S",
+  "conv_ext_metadata": "test-batch",
+  "questions": [
+    {"questionId": "Q1", "questionText": "Фахівець привітався?", "answerType": "BOOLEAN", "validChoices": null},
+    {"questionId": "Q2", "questionText": "Фахівець назвав себе?", "answerType": "BOOLEAN", "validChoices": null},
+    {"questionId": "Q3", "questionText": "Фахівець сказав що розмова записується?", "answerType": "BOOLEAN", "validChoices": null},
+    {"questionId": "Q4", "questionText": "Фахівець був ввічливим?", "answerType": "BOOLEAN", "validChoices": null},
+    {"questionId": "Q5", "questionText": "Як попрощався фахівець?", "answerType": "TEXT", "validChoices": null},
+    {"questionId": "Q6", "questionText": "Чи була проблема вирішена?", "answerType": "CHOICE", "validChoices": ["Повністю", "Частково", "Не вирішена"]}
+  ]
+}'''
+
+
+async def test_analysis():
+    # First run (no prev_result)
+    result, success = await analyze_transcription_questions(
+        request_json=SAMPLE_REQUEST_JSON,
+        model=settings.OPENAI_MODEL_CHAT_ANALYSIS_ENGINE,
+        parallel_requests=tr_settings.TR_ANALYSIS_PARALLEL_REQUESTS,  
+        prev_result=None,
+        timeout=120.0,
+    )
+
+    print("SUCCESS:", success)
+    for a in result["answers"]:
+        print(f'{a["questionId"]}: {a["status"]} -> {a.get("answer")}')
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+
+
+
 def run_transcription(start_index=0, end_index=None):
     # Create timestamp for this run
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -250,4 +290,5 @@ def run_transcription(start_index=0, end_index=None):
 # Run the main function
 if __name__ == "__main__":
     # run_transcription(3,3)
-    run_transcription(0,0)  # Change indices to process specific files or ranges
+    # run_transcription(0,0)  # Change indices to process specific files or ranges
+    asyncio.run(test_analysis())

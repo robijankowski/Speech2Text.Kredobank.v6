@@ -32,7 +32,17 @@ class AppSettings(BaseSettings):
 
     OPENAI_MODEL_CHAT_SUMMARY: str 
     OPENAI_MODEL_CHAT_SCORE: str 
+    OPENAI_MODEL_CHAT_ANALYSIS_ENGINE: str
 
+    USE_AZURE_OPENAI: bool = "N"
+
+    AZURE_OPENAI_API_KEY: str = ""
+    AZURE_OPENAI_ENDPOINT: str
+    AZURE_OPENAI_API_VERSION: str
+
+    AZURE_MODEL_CHAT_SUMMARY: str 
+    AZURE_MODEL_CHAT_SCORE: str 
+    AZURE_MODEL_CHAT_ANALYSIS_ENGINE: str
 
     # Pydantic v2 replacement for class Config
     model_config = SettingsConfigDict(
