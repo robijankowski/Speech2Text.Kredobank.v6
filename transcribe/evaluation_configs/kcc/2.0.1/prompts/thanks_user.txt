@@ -1,0 +1,6 @@
+Evaluate ONLY whether the agent thanked the client for the conversation/call.
+
+Transcript:
+"""
+{transcript}
+"""

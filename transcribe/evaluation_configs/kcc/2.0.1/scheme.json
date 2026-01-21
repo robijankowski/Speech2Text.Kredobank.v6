@@ -1,0 +1,17 @@
+{
+  "system_code": "kcctest",
+  "name": "KredoBank Collection Calls (example scheme)",
+  "version": "2.0.1",
+  "valid_from": "2026-01-08",
+  "valid_to": null,
+  "default_model": "gpt-4o",
+  "checks": [
+    "checks/opening_and_verification.json",
+    "checks/clarity_and_accuracy.json",
+    "checks/thanks_for_call.json"
+  ],
+  "scoring": {
+    "aggregation": "weighted_sum",
+    "normalized_percent": true
+  }
+}

@@ -27,6 +27,8 @@ from transcribe.utilities.stats import get_stats, stats_json_to_csv_text, stats_
 from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_stereo, transcript_audio_file_verbose_o4_single_channel
 from transcribe.utilities.evaluation_engine import load_scheme, run_scheme
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme
+from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md
+
 
 AUDIO_FILES = [
     "AUTO-2025-06-30-09-05-380963799218-1096-1751263515.1528148-stereo1.wav",
@@ -73,7 +75,7 @@ AG: Я бачу, що в нас є арешт рахунків.
 CL: На яку суму?
 AG: Я не маю таких данів, не можу вам сказати. І тому у вас не виходить оплатити від'ємний баланс по рахунку, тому що є арешт рахунку.
 CL: Добре. Дякую.
-AG: Гарного вам дня, до побачення.
+AG: Гарного вам дня, до побачення. Дякую за розмову.
 CL: До побачення.
 """
 
@@ -152,9 +154,26 @@ def run_transcription(start_index=0, end_index=None):
     
     try:
 
+        reports = audit_evaluation_configs(tr_settings.TR_EVALUATION_CONFIGS_ROOT)
+        print(format_audit_report_md(reports))
 
+    
+        log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
+        scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 21) )
+        log.info(
+            f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
+        )
 
-        
+        # log.debug(
+        #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        # )
+
+        log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
+        result, success = run_scheme(transcript_text=conversation_test_text, scheme=scheme)
+        log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
+        log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
+
+        return
 
         file_number = start_index
         if end_index is None:

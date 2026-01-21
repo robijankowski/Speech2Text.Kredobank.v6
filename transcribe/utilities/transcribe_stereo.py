@@ -129,7 +129,6 @@ def transcript_audio_file_verbose_o4_stereo(file_name: str,
         response_format="json",
         timestamp_granularities=["segment"],
     )
-
     log.info(f"Single channel transcription done with model: {model}:")
     log.info("\n" + str(transcription.usage))   
 

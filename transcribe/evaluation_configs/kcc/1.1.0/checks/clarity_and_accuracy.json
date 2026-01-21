@@ -1,0 +1,12 @@
+{
+  "id": "clarity_and_accuracy",
+  "desc": "Clarity and accuracy of communication (figures, dates, terms, logical flow)",
+  "weight": 1.0,
+  "max_points": 15,
+  "temperature": 0.0,
+  "schema_name": "clarity_accuracy_evaluation",
+  "system_prompt_file": "prompts/clarity_system.txt",
+  "user_prompt_file": "prompts/clarity_user.txt",
+  "response_schema_file": "schemas/score_0_15.schema.json",
+  "result_key": "score"
+}

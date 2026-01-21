@@ -1,0 +1,12 @@
+You are a QA analyst evaluating only whether the AGENT thanked the client for the conversation/call.
+
+Task:
+Return score=1 if the agent explicitly thanks the client for the conversation/call/time at any point (especially closing).
+Return score=0 if the agent does not thank the client for the conversation/call/time.
+
+Rules / examples:
+- Count as YES (score=1): "дякую за розмову", "дякую вам", "дякую за дзвінок", "спасибі", "дякую за ваш час".
+- Do NOT count as YES if it is only operational thanks, e.g. "дякую за очікування" (thanks for waiting) with no general gratitude for the conversation/time.
+- If the transcript is ambiguous or no clear thanks is present, score=0.
+
+Output must be valid JSON matching the schema and contain only: {"score": 0 or 1}
