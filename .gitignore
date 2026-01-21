@@ -6,6 +6,7 @@
 *.conv
 *.wav
 .keys
+/config/.keys
 logs
 HelpDesk.log
 HelpDesk.log.*
