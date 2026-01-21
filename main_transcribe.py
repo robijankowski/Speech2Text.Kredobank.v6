@@ -290,5 +290,5 @@ def run_transcription(start_index=0, end_index=None):
 # Run the main function
 if __name__ == "__main__":
     # run_transcription(3,3)
-    # run_transcription(0,0)  # Change indices to process specific files or ranges
+    run_transcription(0,0)  # Change indices to process specific files or ranges
     asyncio.run(test_analysis())
