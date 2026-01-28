@@ -3,7 +3,7 @@ from transcribe.core.tr_config import tr_settings
 
 log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
 
-from openai_tools.openai_client_transcribe import transcribe_audio_file, Transcription
+from openai_tools.openai_client_transcribe import transcribe_audio, Transcription
 
 from core.config import settings
 from transcribe.utilities.stats import set_stats
@@ -90,7 +90,7 @@ def transcript_audio_file_verbose_o4_single_channel(
     file_name: str,
     o4_metadata_text: str = "",
     temperature: float = 0.0,
-    model=settings.OPENAI_MODEL_TRANSCRIBE_STEREO,
+    model: str= "",
 ) -> Transcription:
     """
     Transcribe a single isolated channel (only one speaker audible),
@@ -98,8 +98,11 @@ def transcript_audio_file_verbose_o4_single_channel(
     """
     prompt = SINGLE_CHANNEL_UNKNOWN_ROLE_PROMPT_EN.format(metadata=o4_metadata_text or "")
 
-    transcription = transcribe_audio_file(
-        file_name,
+    if not model:
+        model = settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+
+    transcription = transcribe_audio(
+        audio=file_name,
         model=model,
         prompt=prompt,
         temperature=temperature,
@@ -117,19 +120,23 @@ def transcript_audio_file_verbose_o4_single_channel(
 def transcript_audio_file_verbose_o4_stereo(file_name: str, 
                                             o4_metadata_text="", 
                                             temperature=0.0,
-                                            model=settings.OPENAI_MODEL_TRANSCRIBE_STEREO) -> Transcription:
+                                            model: str = ""
+                                            ) -> Transcription:
     
     prompt = STEREO_PROMPT_UA.format(metadata=o4_metadata_text or "")
 
-    transcription = transcribe_audio_file(
-        file_name,
+    if not model:
+        model = settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+
+    transcription = transcribe_audio(
+        audio=file_name,
         model=model,
         prompt=prompt,
         temperature=temperature,
         response_format="json",
         timestamp_granularities=["segment"],
     )
-    log.info(f"Single channel transcription done with model: {model}:")
+    log.info(f"Stereo file transcription done with model: {model}:")
     log.info("\n" + str(transcription.usage))   
 
     return transcription

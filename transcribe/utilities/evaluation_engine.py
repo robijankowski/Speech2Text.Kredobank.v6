@@ -12,6 +12,7 @@ log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
 
 from openai_tools.openai_client_text import chat_completion_with_format  
 
+from core.config import settings
 
 @dataclass(frozen=True)
 class CheckDef:
@@ -212,7 +213,10 @@ def run_scheme(
     success == False -> at least one check errored, totals/percent are NOT calculated
                        (but already computed details are returned)
     """
-    model = model_override or scheme.default_model
+    if not model_override:
+        model = settings.AZURE_MODEL_CHAT_ANALYSIS_ENGINE if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_ANALYSIS_ENGINE
+    else:
+        model = model_override
 
     scheme_checks: List[CheckDef] = list(scheme.checks)
     scheme_ids = {c.id for c in scheme_checks}

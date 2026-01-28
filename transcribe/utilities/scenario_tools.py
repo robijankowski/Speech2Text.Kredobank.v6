@@ -20,7 +20,7 @@ from openai_tools.openai_client_text import chat_completion, async_chat_completi
 
 def split_transcription_into_roles_4o(agent_text, client_text, stereo_text, 
                                       metadata_text="", 
-                                      model=settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES):
+                                      model: str = "") -> str:
     SYSTEM_PROMPT = """
 You are a highly accurate transcription and dialogue reconstruction assistant with specialized expertise in speaker identification.
 
@@ -108,6 +108,10 @@ Remember: Your accuracy in speaker identification is critical. Take time to cros
 
 Do not include timestamps, metadata, or section headers. Output only the final reconstructed script with verified speaker labels.
 """
+
+    if not model:
+        model = settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
+
     response = chat_completion(
         model=model,    
         temperature=0,
@@ -154,7 +158,7 @@ SCHEMA_SPEAKER_DETECTION = {
 
 
 
-def detect_speaker_roles(text1: str, text2: str, model: str = settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER) -> dict:
+def detect_speaker_roles(text1: str, text2: str, model: str = "") -> dict:
     """
     Detect which transcribed text belongs to the bank AGENT and which to the CLIENT.
     
@@ -190,7 +194,9 @@ Consider these clues:
 Classify each text as either AGENT or CLIENT."""
 
 
-    
+    if not model:
+        model = settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
+
     # Call the API with structured output
     response = chat_completion_with_format(
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, 

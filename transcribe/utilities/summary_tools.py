@@ -138,7 +138,7 @@ TRANSCRIPT TO ANALYZE:
 
 
 def generate_crm_summary_o4(transcript_text, 
-                            model=settings.OPENAI_MODEL_CHAT_SUMMARY):
+                            model="") -> str:
     """
     Generate a structured CRM summary from a conversation transcript (in Ukrainian).
     
@@ -153,7 +153,9 @@ def generate_crm_summary_o4(transcript_text,
     system_prompt = SYSTEM_PROMPT
     user_prompt = USER_PROMPT.format(transcript_text=transcript_text or "")
 
-    
+    if not model:
+        model = settings.AZURE_MODEL_CHAT_SUMMARY if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_SUMMARY
+
     response = chat_completion(
         model=model,    
         temperature=0,

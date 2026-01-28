@@ -1,106 +1,104 @@
+# openai_client_transcribe.py (router)
+
 from __future__ import annotations
 
-from typing import Iterable, Optional, Union
-import httpx
-from tenacity import retry, wait_random_exponential, stop_after_attempt
-
-from openai import OpenAI, AsyncOpenAI
-from openai.types.audio import Transcription
+from pathlib import Path
+from typing import Any, BinaryIO, Optional, Union, TypeAlias
 
 from core.config import settings
 
-
-# --- clients (same style as openai_client_utilities.py) ---
-_transcribe_client = OpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    timeout=httpx.Timeout(120.0, connect=10.0),
+# Import your two implementations (you already do this pattern for text)
+from openai_tools.openai_client_transcribe_azure import (
+    transcribe_audio_azure,
+    async_transcribe_audio_azure,
+)
+from openai_tools.openai_client_transcribe_native import (
+    transcribe_audio_native,
+    async_transcribe_audio_native,
+    Transcription,
 )
 
-_async_transcribe_client = AsyncOpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    http_client=httpx.AsyncClient(
-        limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
-        timeout=httpx.Timeout(120.0, connect=10.0),
-    ),
-)
+# Re-export a common type for callers (so `from ... import Transcription` works)
 
 
-def _normalize_timestamp_granularities(
-    timestamp_granularities: Optional[Union[str, Iterable[str]]]
-) -> Optional[list[str]]:
-    if timestamp_granularities is None:
-        return None
-    if isinstance(timestamp_granularities, str):
-        return [timestamp_granularities]
-    return list(timestamp_granularities)
+AudioInput = Union[str, Path, BinaryIO]
 
 
-def transcribe_audio_file(
-    file_path: str,
+def transcribe_audio(
     *,
+    audio: AudioInput,
     model: Optional[str] = None,
-    prompt: str = "",
+    language: Optional[str] = None,
+    prompt: Optional[str] = None,
     temperature: float = 0.0,
-    response_format: str = "json",
-    timestamp_granularities: Optional[Union[str, Iterable[str]]] = None,
     timeout: float = 120.0,
+    response_format: Optional[str] = None,
+    **kwargs: Any,
 ) -> Transcription:
     """
-    Sync transcription tool call.
+    Router wrapper:
+      - Azure when settings.USE_AZURE_OPENAI == "Y"
+      - Otherwise native OpenAI
 
-    Note:
-      - If you pass timestamp_granularities, response_format MUST be "verbose_json".
-        (OpenAI docs requirement)
+    Parameters are explicit and passed through 1:1 to the underlying implementation.
     """
-    model = model or settings.OPENAI_MODEL_TRANSCRIBE_STEREO
-
-    ts = _normalize_timestamp_granularities(timestamp_granularities)
-    if ts and response_format != "json":
-        response_format = "json"  # required when timestamps requested
-
-    with open(file_path, "rb") as audio_file:
-        return _transcribe_client.audio.transcriptions.create(
-            file=audio_file,
+    if settings.USE_AZURE_OPENAI == "Y":
+        return transcribe_audio_azure(
+            audio=audio,
             model=model,
-            response_format=response_format,
-            temperature=temperature,
+            language=language,
             prompt=prompt,
-            timestamp_granularities=ts,
+            temperature=temperature,
             timeout=timeout,
+            response_format=response_format,
+            **kwargs,
         )
 
+    return transcribe_audio_native(
+        audio=audio,
+        model=model,
+        language=language,
+        prompt=prompt,
+        temperature=temperature,
+        timeout=timeout,
+        response_format=response_format,
+        **kwargs,
+    )
 
-@retry(
-    wait=wait_random_exponential(multiplier=1, min=1, max=40),
-    stop=stop_after_attempt(3),
-    reraise=True,
-)
-async def async_transcribe_audio_file(
-    file_path: str,
+
+async def async_transcribe_audio(
     *,
+    audio: AudioInput,
     model: Optional[str] = None,
-    prompt: str = "",
+    language: Optional[str] = None,
+    prompt: Optional[str] = None,
     temperature: float = 0.0,
-    response_format: str = "json",
-    timestamp_granularities: Optional[Union[str, Iterable[str]]] = None,
     timeout: float = 120.0,
+    response_format: Optional[str] = None,
+    **kwargs: Any,
 ) -> Transcription:
     """
-    Async transcription tool call (with retries, same style as your async chat utilities).
+    Async router wrapper (same logic as transcribe_audio).
     """
-    model = model or settings.OPENAI_MODEL_TRANSCRIBE_STEREO
-
-    ts = _normalize_timestamp_granularities(timestamp_granularities)
-    if ts and response_format != "json":
-        response_format = "json"
-
-    with open(file_path, "rb") as audio_file:
-        return await _async_transcribe_client.audio.transcriptions.create(
-            file=audio_file,
+    if settings.USE_AZURE_OPENAI == "Y":
+        return await async_transcribe_audio_azure(
+            audio=audio,
             model=model,
-            response_format=response_format,
-            temperature=temperature,
+            language=language,
             prompt=prompt,
-            timestamp_granularities=ts,
+            temperature=temperature,
             timeout=timeout,
+            response_format=response_format,
+            **kwargs,
         )
+
+    return await async_transcribe_audio_native(
+        audio=audio,
+        model=model,
+        language=language,
+        prompt=prompt,
+        temperature=temperature,
+        timeout=timeout,
+        response_format=response_format,
+        **kwargs,
+    )
