@@ -11,15 +11,14 @@ OPENAI_MODEL_CHAT_SCORE="gpt-4o"
 OPENAI_MODEL_CHAT_ANALYSIS_ENGINE="gpt-4o-mini"
 
 
-AZURE_OPENAI_ENDPOINT="https://<resource-name>.openai.azure.com"
-AZURE_OPENAI_API_VERSION="2024-02-01"
+AZURE_OPENAI_ENDPOINT="https://testkbazure.cognitiveservices.azure.com/"
+AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 
-AZURE_MODEL_TRANSCRIBE_STEREO="azure-gpt-4o-transcribe"
+AZURE_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe-azure-test"
 
-AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="azure-gpt-4o"
-AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="azure-gpt-4o"
+AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-5.2-chat-azure-test"
+AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2-chat-azure-test"
 
-AZURE_MODEL_CHAT_SUMMARY="azure-gpt-4o"
-AZURE_MODEL_CHAT_SCORE="azure-gpt-4o"
-AZURE_MODEL_CHAT_ANALYSIS_ENGINE="azure-gpt-4o-mini"
-
+AZURE_MODEL_CHAT_SUMMARY="gpt-5-mini-azure-test"
+AZURE_MODEL_CHAT_SCORE="gpt-5-mini-azure-test"
+AZURE_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini-azure-test"
