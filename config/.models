@@ -2,6 +2,7 @@ USE_AZURE_OPENAI="N"
 
 
 OPENAI_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe"
+OPENAI_MODEL_TRANSCRIBE_DIARIZE="gpt-4o-transcribe-diarize"
 
 OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-4o"
 OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-4o"
@@ -15,6 +16,7 @@ AZURE_OPENAI_ENDPOINT="https://testkbazure.cognitiveservices.azure.com/"
 AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 
 AZURE_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe-azure-test"
+AZURE_MODEL_TRANSCRIBE_DIARIZE="gpt-4o-transcribe-diarize-azure-test"
 
 AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-5.2-chat-azure-test"
 AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2-chat-azure-test"

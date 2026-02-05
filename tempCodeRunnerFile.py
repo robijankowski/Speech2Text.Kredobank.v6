@@ -1,2 +1,1 @@
-
-        parallel_requests=tr_settings.TR_ANALYSIS_PARALLEL_REQUESTS,
+def detect_agent_interruptions_from_diarized_segments(

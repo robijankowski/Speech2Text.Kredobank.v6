@@ -194,26 +194,26 @@ def run_transcription(start_index=0, end_index=None):
     
     try:
 
-        reports = audit_evaluation_configs(tr_settings.TR_EVALUATION_CONFIGS_ROOT)
-        print(format_audit_report_md(reports))
+        # reports = audit_evaluation_configs(tr_settings.TR_EVALUATION_CONFIGS_ROOT)
+        # print(format_audit_report_md(reports))
 
     
-        log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
-        scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 21) )
-        log.info(
-            f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
-        )
-
-        # log.debug(
-        #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        # log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
+        # scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 21) )
+        # log.info(
+        #     f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
         # )
 
-        log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
-        result, success = run_scheme(transcript_text=conversation_test_text, scheme=scheme)
-        log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
-        log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
+        # # log.debug(
+        # #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        # # )
 
-        return
+        # log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
+        # result, success = run_scheme(transcript_text=conversation_test_text, scheme=scheme)
+        # log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
+        # log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
+
+        # return
 
         file_number = start_index
         if end_index is None:
@@ -291,4 +291,4 @@ def run_transcription(start_index=0, end_index=None):
 if __name__ == "__main__":
     # run_transcription(3,3)
     run_transcription(0,0)  # Change indices to process specific files or ranges
-    # asyncio.run(test_analysis())
+    asyncio.run(test_analysis())

@@ -15,6 +15,7 @@ AZURE_MODEL_CHAT_MINI="gpt-5-mini-azure-test"
 
 azure_subscription_key = settings.AZURE_OPENAI_API_KEY
 azure_endpoint = "https://testkbazure.cognitiveservices.azure.com/"
+
 azure_api_version = "2024-12-01-preview"
 
 azure_client = AzureOpenAI(
