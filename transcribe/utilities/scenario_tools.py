@@ -294,3 +294,76 @@ def format_scenario_md(text):
     
     return result
 
+
+
+
+
+
+
+SCHEMA_SINGLE_SPEAKER_ROLE = {
+    "type": "object",
+    "properties": {
+        "speaker": {
+            "type": "string",
+            "enum": ["AGENT", "CLIENT"],
+            "description": "Whether the provided text is spoken by a bank AGENT or a CLIENT"
+        },
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+        },
+        "reason": {
+            "type": "string",
+            "description": "Short reason for the classification"
+        }
+    },
+    "required": ["speaker", "confidence", "reason"],
+    "additionalProperties": False
+}
+
+
+def classify_agent_or_client_prefix(text: str, model: str = "") -> str:
+    """
+    Classify a single transcript text block as AGENT or CLIENT and return prefix:
+      - 'AG:' if agent
+      - 'CL:' if client
+    """
+    system_prompt = (
+        "You are an expert at analyzing bank call transcripts and identifying whether the speaker "
+        "is a bank agent or a bank client."
+    )
+
+    user_prompt = f"""You are analyzing ONE transcript block from a phone call.
+
+TEXT:
+{text}
+
+Decide whether this text is spoken by the bank AGENT or by the CLIENT.
+
+Clues:
+- AGENT: introduces themselves, mentions bank/company, policy/procedure, verification, payment instructions, professional tone
+- CLIENT: asks what is going on, describes personal situation, reacts emotionally, requests help, complains/confusion
+
+Return only the structured classification.
+"""
+
+    if not model:
+        model = (
+            settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER
+            if settings.USE_AZURE_OPENAI == "Y"
+            else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
+        )
+
+    resp = chat_completion_with_format(
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        format_schema=SCHEMA_SINGLE_SPEAKER_ROLE,
+        schema_name="single_speaker_role",
+        model=model,
+        temperature=0.0,
+    )
+
+    result = json.loads(resp.choices[0].message.content)
+    return "AG" if result["speaker"] == "AGENT" else "CL"

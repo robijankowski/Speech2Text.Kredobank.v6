@@ -136,3 +136,87 @@ async def async_transcribe_audio_native(
             timeout=timeout,
             **kwargs,
         )
+
+
+
+
+
+
+# --- diarize defaults ---
+def _default_transcribe_diarize_model() -> str:
+    # Prefer a dedicated setting if you have one; fall back safely.
+    return settings.OPENAI_MODEL_TRANSCRIBE_DIARIZE or "gpt-4o-transcribe-diarize"
+
+
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+def transcribe_audio_native_diarized(
+    *,
+    audio: AudioInput,
+    model: Optional[str] = None,
+    language: Optional[str] = None,
+    prompt: Optional[str] = None,
+    temperature: float = 0.0,
+    chunking_strategy: str = "auto",
+    timeout: float = 120.0,
+    **kwargs: Any,
+) -> Any:
+    """
+    Sync native diarized transcription wrapper (with retries).
+    Uses response_format="diarized_json".
+    """
+    model = model or _default_transcribe_diarize_model()
+
+    print(f"Transcribe '{str(audio)}' using native diarize model: {model}")
+
+    with _open_audio(audio) as audio_file:
+        return _openai_transcribe_client.audio.transcriptions.create(
+            file=audio_file,
+            model=model,
+            language=language,
+            prompt=prompt,
+            temperature=temperature,
+            response_format="diarized_json",
+            chunking_strategy=chunking_strategy,
+            timeout=timeout,
+            **kwargs,
+        )
+
+
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+async def async_transcribe_audio_native_diarized(
+    *,
+    audio: AudioInput,
+    model: Optional[str] = None,
+    language: Optional[str] = None,
+    prompt: Optional[str] = None,
+    temperature: float = 0.0,
+    chunking_strategy: str = "auto",
+    timeout: float = 120.0,
+    **kwargs: Any,
+) -> Any:
+    """
+    Async native diarized transcription wrapper (with retries).
+    Uses response_format="diarized_json".
+    """
+    model = model or _default_transcribe_diarize_model()
+
+    with _open_audio(audio) as audio_file:
+        return await _async_openai_transcribe_client.audio.transcriptions.create(
+            file=audio_file,
+            model=model,
+            language=language,
+            prompt=prompt,
+            temperature=temperature,
+            response_format="diarized_json",
+            chunking_strategy=chunking_strategy,
+            timeout=timeout,
+            **kwargs,
+        )

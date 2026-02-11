@@ -247,7 +247,22 @@ def detect_agent_interruptions_from_diarized_segments(
     return {"events": [asdict(e) for e in events], "stats": stats}
 
 
-segments = transcript_audio_file_verbose_o4_diarize("./test/test_call.wav")
+# segments = transcript_audio_file_verbose_o4_diarize("./test/test_call.wav")
+# result = detect_agent_interruptions_from_diarized_segments(
+#     diarized_segments=segments,
+#     agent_speaker="A",
+#     min_overlap_ms=300,
+#     min_client_lead_ms=300,
+#     min_agent_segment_ms=200,
+#     ignore_short_agent_backchannels=True,  # opcjonalnie
+# )
+
+# print(result["stats"])
+# for e in result["events"][:5]:
+#     print(e["client_start"], e["agent_start"], e["overlap_sec"], e["client_text"], "||", e["agent_text"])
+
+
+segments = transcript_audio_file_verbose_o4_diarize("./test/Одночасна розмова фахівця і клієнта.wav")
 result = detect_agent_interruptions_from_diarized_segments(
     diarized_segments=segments,
     agent_speaker="A",
@@ -261,6 +276,20 @@ print(result["stats"])
 for e in result["events"][:5]:
     print(e["client_start"], e["agent_start"], e["overlap_sec"], e["client_text"], "||", e["agent_text"])
 
+
+# segments = transcript_audio_file_verbose_o4_diarize("./test/Святослав одночасна розмова з клієнтом , деколи перебиває.wav")
+# result = detect_agent_interruptions_from_diarized_segments(
+#     diarized_segments=segments,
+#     agent_speaker="A",
+#     min_overlap_ms=300,
+#     min_client_lead_ms=300,
+#     min_agent_segment_ms=200,
+#     ignore_short_agent_backchannels=True,  # opcjonalnie
+# )
+
+# print(result["stats"])
+# for e in result["events"][:5]:
+#     print(e["client_start"], e["agent_start"], e["overlap_sec"], e["client_text"], "||", e["agent_text"])
 
 
 

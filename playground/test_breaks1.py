@@ -6,10 +6,14 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 # Twoje moduły z projektu:
 from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
 from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_single_channel
+from openai import OpenAI
 
 
 ChannelSide = Literal["L", "R"]
 
+from core.config import settings    
+
+openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 @dataclass
 class InterruptionEvent:
@@ -59,6 +63,72 @@ def _get_segments(transcription: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def transcript_audio_file_verbose_o4_diarize(
+    file_name,
+    temperature=0.0,
+    language="uk",
+    chunking_strategy="auto",
+):
+    """
+    Uses gpt-4o-transcribe-diarize and prints diarization markers (speaker, start, end) per segment.
+    Note: diarize model returns speaker annotations only with response_format="diarized_json"
+    and does NOT support prompt or timestamp_granularities. :contentReference[oaicite:2]{index=2}
+    """
+    model = "gpt-4o-transcribe-diarize"
+    print(f"Transcribing file: {file_name} using '{model}'")
+
+    def _fmt_ts(seconds: float) -> str:
+        # 00:00.00 formatting
+        if seconds is None:
+            return "??:??.??"
+        m, s = divmod(float(seconds), 60.0)
+        return f"{int(m):02d}:{s:05.2f}"
+
+    def _get(obj, key, default=None):
+        # supports dicts or objects
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+
+    with open(file_name, "rb") as audio_file:
+        transcript = openai_client.audio.transcriptions.create(
+            file=audio_file,
+            model=model,
+            response_format="diarized_json",
+            # language=language,
+            temperature=temperature,
+            chunking_strategy=chunking_strategy
+        )
+
+    # Print usage if present (guarded)
+    usage = _get(transcript, "usage")
+    if usage is not None:
+        print("Usage:", usage)
+
+    # Print ALL diarization markers (speaker/start/end/text)
+    segments = _get(transcript, "segments", []) or []
+    print(f"Segments: {len(segments)}")
+    print(str(segments))
+    for seg in segments:
+        print(str(seg))
+    speakers_seen = set()
+
+    for i, seg in enumerate(segments, start=1):
+        speaker = _get(seg, "speaker", "unknown")
+        start = _get(seg, "start", None)
+        end = _get(seg, "end", None)
+        text = _get(seg, "text", "")
+
+        speakers_seen.add(speaker)
+        print(f"[{i:04d}] {speaker} {_fmt_ts(start)}–{_fmt_ts(end)}: {text}")
+
+    print("Speakers found:", ", ".join(map(str, sorted(speakers_seen))))
+    
+    return segments
+
+
+
 def detect_agent_interruptions_from_stereo_wav(
     audio_file: str,
     *,
@@ -89,19 +159,25 @@ def detect_agent_interruptions_from_stereo_wav(
     client_wav = right_wav if agent_channel == "L" else left_wav
 
     # 2) Transkrypcja segmentowa obu kanałów
-    tr_agent = transcript_audio_file_verbose_o4_single_channel(
-        file_name=agent_wav,
-        o4_metadata_text=o4_metadata_text,
-        temperature=temperature,
-        model=model,
-    )
-    tr_client = transcript_audio_file_verbose_o4_single_channel(
-        file_name=client_wav,
-        o4_metadata_text=o4_metadata_text,
-        temperature=temperature,
-        model=model,
-    )
+    # tr_agent = transcript_audio_file_verbose_o4_single_channel(
+    #     file_name=agent_wav,
+    #     o4_metadata_text=o4_metadata_text,
+    #     temperature=temperature,
+    #     model=model,
+    # )
+    tr_agent = transcript_audio_file_verbose_o4_diarize(file_name=agent_wav)
+    print(f"Agent transcription done. {tr_agent}")
 
+
+    # tr_client = transcript_audio_file_verbose_o4_single_channel(
+    #     file_name=client_wav,
+    #     o4_metadata_text=o4_metadata_text,
+    #     temperature=temperature,
+    #     model=model,
+    # )
+    tr_client = transcript_audio_file_verbose_o4_diarize(file_name=client_wav)
+    print(f"Client transcription done. {tr_client}")
+    
     agent_segs = _get_segments(tr_agent)
     client_segs = _get_segments(tr_client)
 
@@ -173,8 +249,18 @@ def detect_agent_interruptions_from_stereo_wav(
     }
 
 
+# result = detect_agent_interruptions_from_stereo_wav(
+#     "./test/test_call.wav",
+#     agent_channel="L",   # jeśli agent jest na prawym kanale
+#     min_overlap_ms=300,
+#     min_client_lead_ms=400,
+# )
+
+# print(result["stats"])
+# print(result["events"][:3])
+
 result = detect_agent_interruptions_from_stereo_wav(
-    "./test/test_call.wav",
+    "./test/Одночасна розмова фахівця і клієнта.wav",
     agent_channel="L",   # jeśli agent jest na prawym kanale
     min_overlap_ms=300,
     min_client_lead_ms=400,
@@ -183,3 +269,13 @@ result = detect_agent_interruptions_from_stereo_wav(
 print(result["stats"])
 print(result["events"][:3])
 
+
+# result = detect_agent_interruptions_from_stereo_wav(
+#     "./test/Святослав одночасна розмова з клієнтом , деколи перебиває.wav",
+#     agent_channel="L",   # jeśli agent jest na prawym kanale
+#     min_overlap_ms=300,
+#     min_client_lead_ms=400,
+# )
+
+# print(result["stats"])
+# print(result["events"][:3])
