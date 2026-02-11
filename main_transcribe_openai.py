@@ -24,12 +24,12 @@ from transcribe.utilities.scenario_tools import split_transcription_into_roles_4
 from transcribe.utilities.md_creator import create_documentation_md
 from transcribe.utilities.summary_tools import generate_crm_summary_o4, format_summary_md
 from transcribe.utilities.evaluate_tools import evaluate_call, format_evaluation_results_md, format_evaluation_results
-from transcribe.utilities.audio_tools import prepare_audio_for_transcription
+from transcribe.utilities.audio_tools import prepare_audio_for_transcription, stereo_to_mono
 from transcribe.utilities.stats import get_stats, stats_json_to_csv_text, stats_save_json_to_csv, clean_file_names
 from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_stereo, transcript_audio_file_verbose_o4_single_channel
 from transcribe.utilities.evaluation_engine import load_scheme, run_scheme
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme
-from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md
+from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md, is_configuration_ok
 from transcribe.utilities.call_analysis_engine import analyze_transcription_questions
 
 AUDIO_FILES = [
@@ -41,11 +41,11 @@ AUDIO_FILES = [
 ]
 
 O4_METADATA = [
-    "Імена учасників: 'Іволо Олена Володимирівна', Ім'я агента: 'Уляна'; Назва банку: 'KredoBank Україна'",
-    "Імена учасників: 'Лукашчук Сергій Миколаївич', Ім'я агента: 'Святослав'; Назва банку: 'KredoBank Україна'",
-    "",
-    "Ім'я агента: 'Іванна'; Назва банку: 'KredoBank Україна'",
-    ""
+    {"name": "Ivolo Olena Volodymyrivna", "agent": "Ulyana", "bank": "KredoBank Ukraine"},
+    {"name": "Lukashchuk Serhii Mykolayivych", "agent": "Sviatoslav", "bank": "KredoBank Ukraine"},
+    {},
+    {"agent": "Ivanova", "bank": "KredoBank Ukraine"},
+    {}
 ]
 
 WHISPER_METADATA = [
@@ -145,6 +145,7 @@ error_res = {
   "score_percent": 16.67
 }
 
+CALL_INFO = {"callType":"debt", "phoneType":"fin", "dpd":"dpd30"}
 
 SAMPLE_REQUEST_JSON = r'''{
   "systemId": "CRM_TEST",
@@ -194,22 +195,28 @@ def run_transcription(start_index=0, end_index=None):
     
     try:
 
-        # reports = audit_evaluation_configs(tr_settings.TR_EVALUATION_CONFIGS_ROOT)
-        # print(format_audit_report_md(reports))
-
+        reports = audit_evaluation_configs(tr_settings.TR_EVALUATION_CONFIGS_ROOT)
+        print(format_audit_report_md(reports))
+        print(f"Is configuration OK? {is_configuration_ok(reports)} ")
     
         # log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
-        # scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 21) )
+        # scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, 
+        #                             "kcc", 
+        #                             call_date=date(2026, 1, 21),
+        #                             call_info=CALL_INFO)
         # log.info(
         #     f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
         # )
 
-        # # log.debug(
-        # #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
-        # # )
+        # log.debug(
+        #     f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        # )
 
+        # metadata_json = O4_METADATA[0]
         # log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
-        # result, success = run_scheme(transcript_text=conversation_test_text, scheme=scheme)
+        # result, success = run_scheme(transcript_text=conversation_test_text, 
+        #                              metadata=json.dumps(metadata_json), 
+        #                              scheme=scheme)
         # log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
         # log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
 
@@ -221,11 +228,12 @@ def run_transcription(start_index=0, end_index=None):
 
         while file_number <= end_index:
             audio_file = "./test/sources/" + AUDIO_FILES[file_number]
-            metadata_text = O4_METADATA[file_number]
+            metadata_text = json.dumps(O4_METADATA[file_number])
 
             log.info(f"\n\nStereo WAV File Splitter and Transcription Tool - FILE NUMBER: {file_number}")
             log.info("=" * 60)
 
+            
             l_file_cleaned, r_file_cleaned, s_file_cleaned = prepare_audio_for_transcription(audio_file, 
                                                                                              tr_settings.TR_TEMP_ROOT_DIR)
 
@@ -267,7 +275,10 @@ def run_transcription(start_index=0, end_index=None):
             log.info("\n" + summary)
 
             log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
-            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 5) )
+            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, 
+                                        "kcc", 
+                                        call_date=date(2026, 1,15),
+                                        call_info=CALL_INFO)
             log.info(
                 f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
             )
@@ -276,7 +287,9 @@ def run_transcription(start_index=0, end_index=None):
             # )
 
             log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
-            result, success = run_scheme(transcript_text=scenario, scheme=scheme)
+            result, success = run_scheme(transcript_text=scenario, 
+                                         metadata=metadata_text, 
+                                         scheme=scheme)
             log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
             log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
 
@@ -290,5 +303,8 @@ def run_transcription(start_index=0, end_index=None):
 # Run the main function
 if __name__ == "__main__":
     # run_transcription(3,3)
+    # audio_file = "./test/test_call.wav"
+    # stereo_to_mono(audio_file, out_file=audio_file.replace(".wav", "_mono.wav"))
+
     run_transcription(0,0)  # Change indices to process specific files or ranges
-    asyncio.run(test_analysis())
+    # asyncio.run(test_analysis())

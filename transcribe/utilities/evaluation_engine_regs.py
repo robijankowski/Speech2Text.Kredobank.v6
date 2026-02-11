@@ -123,6 +123,7 @@ def load_active_scheme(
     config_root,
     system_code: str,
     call_date: date,
+    call_info: Optional[Dict[str, Any]] = None,
     prev_result: Optional[Dict[str, Any]] = None,
 ):
     """
@@ -140,7 +141,7 @@ def load_active_scheme(
             call_date=None,
             version=prev_version,
         )
-        return load_scheme(scheme_path)
+        return load_scheme(scheme_path, call_info=call_info)
 
     # 2) Fallback: select by date
     scheme_path = resolve_scheme_path(
@@ -149,4 +150,4 @@ def load_active_scheme(
         call_date=call_date,
         version=None,
     )
-    return load_scheme(scheme_path)
+    return load_scheme(scheme_path, call_info=call_info)

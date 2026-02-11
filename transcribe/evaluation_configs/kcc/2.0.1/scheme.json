@@ -6,10 +6,16 @@
   "valid_to": null,
   "default_model": "gpt-4o",
   "checks": [
-    "checks/opening_and_verification.json",
-    "checks/clarity_and_accuracy.json",
     "checks/thanks_for_call.json"
   ],
+  "conditional_checks": {
+    "DPD00": [
+        "checks/clarity_and_accuracy.json"
+    ],
+    "DPD30": [
+        "checks/opening_and_verification.json"
+    ]
+  },
   "scoring": {
     "aggregation": "weighted_sum",
     "normalized_percent": true

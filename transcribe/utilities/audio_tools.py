@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Literal, Optional
+
 from pydub import AudioSegment
 from pydub.effects import normalize
 import os
@@ -151,4 +155,51 @@ def trim_audio_to_secs(in_file: str, out_file: str, secs: float) -> str:
     out_format = ext if ext else "wav"
 
     trimmed.export(out_file, format=out_format)
+    return out_file
+
+
+
+
+
+MonoMode = Literal["left", "right", "mix"]
+
+
+def stereo_to_mono(
+    stereo_file_path: str,
+    out_file: Optional[str] = None,
+    *,
+    mode: MonoMode = "mix",
+    frame_rate: int = 16000,
+) -> str:
+    """
+    Create a mono WAV from a stereo audio file.
+
+    mode:
+      - "left": keep left channel only
+      - "right": keep right channel only
+      - "mix": average left+right into one mono channel
+    """
+    audio = AudioSegment.from_file(stereo_file_path)
+
+    if out_file is None:
+        base, _ = os.path.splitext(stereo_file_path)
+        out_file = f"{base}_mono.wav"
+
+    if audio.channels == 1:
+        mono = audio
+    elif audio.channels == 2:
+        if mode == "left":
+            mono = audio.split_to_mono()[0]
+        elif mode == "right":
+            mono = audio.split_to_mono()[1]
+        elif mode == "mix":
+            mono = audio.set_channels(1)  # downmix
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+    else:
+        # fallback: downmix multi-channel to mono
+        mono = audio.set_channels(1)
+
+    mono = mono.set_frame_rate(frame_rate)
+    mono.export(out_file, format="wav")
     return out_file

@@ -44,11 +44,11 @@ AUDIO_FILES = [
 ]
 
 O4_METADATA = [
-    "Імена учасників: 'Іволо Олена Володимирівна', Ім'я агента: 'Уляна'; Назва банку: 'KredoBank Україна'",
-    "Імена учасників: 'Лукашчук Сергій Миколаївич', Ім'я агента: 'Святослав'; Назва банку: 'KredoBank Україна'",
-    "",
-    "Ім'я агента: 'Іванна'; Назва банку: 'KredoBank Україна'",
-    ""
+    {"name": "Ivolo Olena Volodymyrivna", "agent": "Ulyana", "bank": "KredoBank Ukraine"},
+    {"name": "Lukashchuk Serhii Mykolayivych", "agent": "Sviatoslav", "bank": "KredoBank Ukraine"},
+    {},
+    {"agent": "Ivanova", "bank": "KredoBank Ukraine"},
+    {}
 ]
 
 WHISPER_METADATA = [
@@ -148,6 +148,7 @@ error_res = {
   "score_percent": 16.67
 }
 
+CALL_INFO = {"callType":"debt", "phoneType":"fin", "dpd":"dpd30"}
 
 SAMPLE_REQUEST_JSON = r'''{
   "systemId": "CRM_TEST",
@@ -236,7 +237,7 @@ def run_transcription(start_index=0, end_index=None):
 
         while file_number <= end_index:
             audio_file = "./test/sources/" + AUDIO_FILES[file_number]
-            metadata_text = O4_METADATA[file_number]
+            metadata_text = json.dumps(O4_METADATA[file_number])
 
             log.info(f"\n\nStereo WAV File Splitter and Transcription Tool - FILE NUMBER: {file_number}")
             log.info("=" * 60)
@@ -282,7 +283,10 @@ def run_transcription(start_index=0, end_index=None):
             log.info("\n" + summary)
 
             log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
-            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, "kcc", call_date=date(2026, 1, 5) )
+            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, 
+                                        "kcc", 
+                                        call_date=date(2026, 1, 15),
+                                        call_info=CALL_INFO)
             log.info(
                 f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n"
             )
@@ -291,7 +295,9 @@ def run_transcription(start_index=0, end_index=None):
             # )
 
             log.info("\n\n" + "="*30 + " Running evaluation scheme " + "="*30)
-            result, success = run_scheme(transcript_text=scenario, scheme=scheme)
+            result, success = run_scheme(transcript_text=scenario, 
+                                         metadata=metadata_text,
+                                         scheme=scheme)
             log.info("\n\n" + "="*30 + " Evaluation Results " + "="*30)
             log.info(f"\n\n{success}\n\n" + str(json.dumps(result, indent=2)))
             

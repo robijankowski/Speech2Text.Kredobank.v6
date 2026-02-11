@@ -9,4 +9,7 @@ Rules / examples:
 - Do NOT count as YES if it is only operational thanks, e.g. "дякую за очікування" (thanks for waiting) with no general gratitude for the conversation/time.
 - If the transcript is ambiguous or no clear thanks is present, score=0.
 
-Output must be valid JSON matching the schema and contain only: {"score": 0 or 1}
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}
+
+
+

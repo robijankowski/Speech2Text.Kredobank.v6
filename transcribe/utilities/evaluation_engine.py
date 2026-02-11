@@ -22,7 +22,7 @@ class CheckDef:
     max_points: int
     temperature: float
     schema_name: str
-    system_prompt: str
+    system_prompt_template: str
     user_prompt_template: str
     response_schema: Dict[str, Any]
     result_key: str = "score"
@@ -48,19 +48,49 @@ def _read_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_scheme(scheme_json_path: str | Path) -> SchemeDef:
+
+def load_scheme(
+    scheme_json_path: str | Path,
+    *,
+    call_info: Optional[Dict[str, Any]] = None,
+) -> SchemeDef:
     """
     Loads scheme.json and resolves relative prompt/schema/check file references.
+
+    If call_info is provided, this function will also include checks configured
+    under scheme["conditional_checks"] (or legacy "conditional_checks") whose
+    keys match ANY value from call_info (case-insensitive). Matching conditional
+    checks are appended to the base scheme["checks"] list (deduplicated).
     """
     scheme_path = Path(scheme_json_path).resolve()
     root = scheme_path.parent
     scheme_raw = _read_json(scheme_path)
 
+    # Resolve base + conditional check file list (relative paths)
+    check_files: List[str] = list(scheme_raw.get("checks", []))
+    cond_map = scheme_raw.get("conditional_checks") or {}
+
+    if call_info and isinstance(cond_map, dict):
+        # Extract all values from call_info and normalize for matching
+        call_values = {
+            str(v).strip().upper()
+            for v in call_info.values()
+            if v is not None and str(v).strip() != ""
+        }
+
+        # Add conditional checks whose key matches any call_info value
+        for cond_key, cond_checks in cond_map.items():
+            key_norm = str(cond_key).strip().upper()
+            if key_norm in call_values and isinstance(cond_checks, list):
+                for rel_path in cond_checks:
+                    if isinstance(rel_path, str) and rel_path not in check_files:
+                        check_files.append(rel_path)
+
     checks: List[CheckDef] = []
-    for rel_check_path in scheme_raw["checks"]:
+    for rel_check_path in check_files:
         chk = _read_json((root / rel_check_path).resolve())
 
-        system_prompt = _read_text(root / chk["system_prompt_file"])
+        system_prompt_template = _read_text(root / chk["system_prompt_file"])
         user_prompt_template = _read_text(root / chk["user_prompt_file"])
         response_schema = _read_json(root / chk["response_schema_file"])
 
@@ -72,7 +102,7 @@ def load_scheme(scheme_json_path: str | Path) -> SchemeDef:
                 max_points=int(chk["max_points"]),
                 temperature=float(chk.get("temperature", 0.0)),
                 schema_name=chk.get("schema_name", f"{chk['id']}_schema"),
-                system_prompt=system_prompt,
+                system_prompt_template=system_prompt_template,
                 user_prompt_template=user_prompt_template,
                 response_schema=response_schema,
                 result_key=chk.get("result_key", "score"),
@@ -93,18 +123,20 @@ def load_scheme(scheme_json_path: str | Path) -> SchemeDef:
     )
 
 
-def run_check(*, transcript_text: str, check: CheckDef, model: str) -> Dict[str, Any]:
+def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: str) -> Dict[str, Any]:
     """
     Runs ONE check and returns a normalized record for reporting.
     """
-    user_prompt = check.user_prompt_template.format(transcript=transcript_text.strip())
+    user_prompt = check.user_prompt_template.format(transcript=transcript_text.strip(), metadata=metadata.strip())
+    system_prompt = check.system_prompt_template.format(transcript=transcript_text.strip(), metadata=metadata.strip())
 
-    log.level = logging.INFO
-    log.debug(f"User prompt for check '{check.id}': {user_prompt}") 
+    # log.level = logging.INFO
+    # log.debug(f"User prompt for check '{check.id}': {user_prompt}") 
+    # log.debug(f"System prompt for check '{check.id}': {system_prompt}")
 
     completion = chat_completion_with_format(
         messages=[
-            {"role": "system", "content": check.system_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         model=model,
@@ -202,6 +234,7 @@ def _error_detail(*, chk: CheckDef, model: str, err: Exception) -> Dict[str, Any
 def run_scheme(
     *,
     transcript_text: str,
+    metadata: str,
     scheme: SchemeDef,
     model_override: Optional[str] = None,
     prev_result: Optional[Dict[str, Any]] = None,
@@ -248,7 +281,7 @@ def run_scheme(
         if reused is None:
             try:
                 # raise Exception("Test exception for debugging")
-                rec = run_check(transcript_text=transcript_text, check=chk, model=model)
+                rec = run_check(transcript_text=transcript_text, metadata=metadata, check=chk, model=model)
             except Exception as e:
                 had_error = True
                 log.exception(
@@ -299,94 +332,6 @@ def run_scheme(
 
     return result, True
 
-
-
-
-
-def run_scheme22222(
-    *,
-    transcript_text: str,
-    scheme: SchemeDef,
-    model_override: Optional[str] = None,
-    prev_result: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    """
-    Runs scheme checks with resume support.
-
-    If prev_result is provided:
-      - keep only details with ids present in scheme.checks
-      - keep only computed details (valid score), normalize them to current scheme
-      - compute only missing / not-yet-computed checks
-      - recompute totals from final details
-
-    total_weighted_score = Σ(score * weight)
-    """
-    model = model_override or scheme.default_model
-
-    # --- build a map of scheme checks
-    scheme_checks: List[CheckDef] = list(scheme.checks)
-    scheme_ids = {c.id for c in scheme_checks}
-
-    # --- ingest + validate prev_result (if any)
-    prev_details_by_id: Dict[str, Dict[str, Any]] = {}
-    if isinstance(prev_result, dict):
-        prev_details = prev_result.get("details")
-        if isinstance(prev_details, list):
-            for item in prev_details:
-                if isinstance(item, dict):
-                    item_id = (item.get("id") or "").strip()
-                    if item_id in scheme_ids:
-                        # last one wins if duplicates
-                        prev_details_by_id[item_id] = item
-
-    # --- merge: normalized previous details + newly computed ones
-    details: List[Dict[str, Any]] = []
-
-    total_weighted = 0.0
-    total_weighted_max = 0.0
-
-    for chk in scheme_checks:
-        reused: Optional[Dict[str, Any]] = None
-
-        if chk.id in prev_details_by_id:
-            reused = _normalize_prev_detail(prev=prev_details_by_id[chk.id], chk=chk)
-
-        if reused is None:
-            # need to compute
-            try:
-                # raise Exception("Test exception for debugging")
-                rec = run_check(transcript_text=transcript_text, check=chk, model=model)
-            except Exception as e:
-                log.exception(
-                    "run_check failed: system=%s scheme=%s v%s check_id=%s model=%s",
-                    scheme.system_code, scheme.name, scheme.version, chk.id, model
-                )
-                rec = _error_detail(chk=chk, model=model, err=e)
-        else:
-            rec = reused
-            if not rec.get("model"):
-                rec["model"] = model
-
-        details.append(rec)
-        total_weighted += float(rec["weighted_score"])
-        total_weighted_max += float(rec["weighted_max"])
-
-
-
-    result: Dict[str, Any] = {
-        "system_code": scheme.system_code,
-        "scheme_name": scheme.name,
-        "scheme_version": scheme.version,
-        "model": model,
-        "total_weighted_score": total_weighted,
-        "total_weighted_max": total_weighted_max,
-        "details": details,
-    }
-
-    if scheme.normalized_percent and total_weighted_max > 0:
-        result["score_percent"] = round(total_weighted / total_weighted_max * 100.0, 2)
-
-    return result
 
 
 
