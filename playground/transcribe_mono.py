@@ -1,7 +1,6 @@
 import logging
-from transcribe.core.tr_config import tr_settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from core.config import settings
 from transcribe.utilities.o4_transcribe_diarized import transcript_audio_file_verbose_o4_diarize

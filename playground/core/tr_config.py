@@ -26,5 +26,5 @@ class AppSettings(BaseSettings):
         
 
 # Instantiate your settings
-tr_settings = AppSettings()
+settings = AppSettings()
 

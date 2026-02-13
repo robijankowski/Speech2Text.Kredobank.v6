@@ -2,7 +2,6 @@ import json
 import logging
 
 from datetime import date, datetime
-from app.transcribe.core.tr_config import tr_settings
 from app.transcribe.utilities.evaluation_engine import load_scheme, run_scheme
 from app.transcribe.utilities.evaluation_engine_regs import load_active_scheme
 

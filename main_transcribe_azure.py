@@ -8,14 +8,13 @@ from unittest import result
 
 from core.config import settings
 from openai_tools.openai_client_transcribe import Transcription
-from transcribe.core.tr_config import tr_settings
 
 from core.logger import setup_logger, shutdown_logger, LogConfig
 log_config = LogConfig(
     log_dir=settings.TRANSCRIBE_LOGS_DIR,
     base_filename=settings.TRANSCRIBE_LOGS_PREF,
     level=logging.DEBUG,
-    logger_name=tr_settings.TR_LOGGER_NAME
+    logger_name=settings.TR_LOGGER_NAME
 )
 log = setup_logger(log_config)
 
@@ -23,7 +22,7 @@ log = setup_logger(log_config)
 
 from transcribe.utilities.scenario_tools import split_transcription_into_roles_4o, format_scenario_md, consolidate_dialogue, detect_speaker_roles, add_prefix_to_sentences
 from transcribe.utilities.md_creator import create_documentation_md
-from transcribe.utilities.summary_tools import generate_crm_summary_o4, format_summary_md
+from transcribe.utilities.summary_tools import generate_crm_summary_for_call_scenario, format_summary_md
 from transcribe.utilities.evaluate_tools import evaluate_call, format_evaluation_results_md, format_evaluation_results
 from transcribe.utilities.audio_tools import prepare_audio_for_transcription
 from transcribe.utilities.stats import get_stats, stats_json_to_csv_text, stats_save_json_to_csv, clean_file_names
@@ -31,7 +30,7 @@ from transcribe.utilities.transcribe_stereo_tools import transcript_audio_file_v
 from transcribe.utilities.evaluation_engine import load_scheme, run_scheme
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme
 from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md
-from transcribe.utilities.call_analysis_engine import analyze_transcription_questions
+from transcribe.utilities.call_analysis_engine import async_analyze_transcription_questions
 
 from openai_tools.openai_client_text import chat_completion
 
@@ -170,10 +169,10 @@ SAMPLE_REQUEST_JSON = r'''{
 
 async def test_analysis():
     # First run (no prev_result)
-    result, success = await analyze_transcription_questions(
+    result, success = await async_analyze_transcription_questions(
         request_json=SAMPLE_REQUEST_JSON,
         model=settings.OPENAI_MODEL_CHAT_ANALYSIS_ENGINE,
-        parallel_requests=tr_settings.TR_ANALYSIS_PARALLEL_REQUESTS,  
+        parallel_requests=settings.TR_ANALYSIS_PARALLEL_REQUESTS,  
         prev_result=None,
         timeout=120.0,
     )
@@ -243,7 +242,7 @@ def run_transcription(start_index=0, end_index=None):
             log.info("=" * 60)
 
             l_file_cleaned, r_file_cleaned, s_file_cleaned = prepare_audio_for_transcription(audio_file, 
-                                                                                             tr_settings.TR_TEMP_ROOT_DIR)
+                                                                                             settings.TR_TEMP_ROOT_DIR)
 
             if l_file_cleaned and r_file_cleaned:
                 log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned left channel wav " + "="*30)
@@ -279,11 +278,11 @@ def run_transcription(start_index=0, end_index=None):
             log.info("\n" + scenario)
 
             log.info("\n\n\n" + "="*30 + " Generating summary " + "="*30)
-            summary = generate_crm_summary_o4(scenario)
+            summary = generate_crm_summary_for_call_scenario(scenario)
             log.info("\n" + summary)
 
             log.info("\n\n" + "="*30 + " Loading current evaluation scheme " + "="*30)
-            scheme = load_active_scheme(tr_settings.TR_EVALUATION_CONFIGS_ROOT, 
+            scheme = load_active_scheme(settings.TR_EVALUATION_CONFIGS_ROOT, 
                                         "kcc", 
                                         call_date=date(2026, 1, 15),
                                         call_info=CALL_INFO)

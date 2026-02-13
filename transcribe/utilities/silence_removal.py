@@ -7,8 +7,9 @@ from pydub.silence import split_on_silence, detect_nonsilent
 
 
 import logging
-from transcribe.core.tr_config import tr_settings
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+from core.config import settings
+
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 

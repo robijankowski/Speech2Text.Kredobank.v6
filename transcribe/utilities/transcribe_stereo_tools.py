@@ -1,7 +1,7 @@
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from openai_tools.openai_client_transcribe import transcribe_audio, Transcription
 
@@ -83,6 +83,9 @@ Known entities canonical names: {metadata}
 ПАМ'ЯТАЙ: Твоє завдання - точно відтворити ТЕ, ЩО БУЛО СКАЗАНО, а не те, що "повинно було б" бути сказано!
 """
 
+def _default_transcription_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
 
 
 
@@ -99,7 +102,7 @@ def transcript_audio_file_verbose_o4_single_channel(
     prompt = SINGLE_CHANNEL_UNKNOWN_ROLE_PROMPT_EN.format(metadata=o4_metadata_text or "")
 
     if not model:
-        model = settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+        model = _default_transcription_model()
 
     transcription = transcribe_audio(
         audio=file_name,
@@ -126,7 +129,7 @@ def transcript_audio_file_verbose_o4_stereo(file_name: str,
     prompt = STEREO_PROMPT_UA.format(metadata=o4_metadata_text or "")
 
     if not model:
-        model = settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+        model = _default_transcription_model()
 
     transcription = transcribe_audio(
         audio=file_name,

@@ -3,9 +3,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import logging
 
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 from transcribe.utilities.scenario_tools import ( split_transcription_into_roles_4o, 

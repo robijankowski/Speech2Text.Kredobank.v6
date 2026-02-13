@@ -7,9 +7,9 @@ from pydub.effects import normalize
 import os
 
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 from transcribe.utilities.noise_reduction import reduce_audio_noise

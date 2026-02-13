@@ -4,9 +4,9 @@ import re
 from core.config import settings
 
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from openai_tools.openai_client_text import  chat_completion_with_format
 from typing import Any, Dict, List, Tuple, Optional

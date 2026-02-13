@@ -4,9 +4,9 @@ import re
 from core.config import settings
 
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 from transcribe.utilities.stats import set_stats
@@ -15,7 +15,14 @@ from openai_tools.openai_token_utilities import num_tokens_from_text
 from openai_tools.openai_client_text import chat_completion, async_chat_completion, chat_completion_with_format
 
 
+def _default_detect_speaker_role_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
 
+
+def _default_split_into_roles_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
 
 
 def split_transcription_into_roles_4o(agent_text, client_text, stereo_text, 
@@ -110,7 +117,7 @@ Do not include timestamps, metadata, or section headers. Output only the final r
 """
 
     if not model:
-        model = settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
+        model = _default_split_into_roles_model()
 
     response = chat_completion(
         model=model,    
@@ -195,7 +202,7 @@ Classify each text as either AGENT or CLIENT."""
 
 
     if not model:
-        model = settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
+        model = _default_detect_speaker_role_model()
 
     # Call the API with structured output
     response = chat_completion_with_format(

@@ -8,7 +8,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Uses your existing OpenAI async wrapper with retries + json_schema structured outputs
 from openai_tools.openai_client_text import async_chat_completion_with_format  # :contentReference[oaicite:2]{index=2}
+from core.config import settings
 
+
+def _default_analysis_model() -> str:
+    return settings.AZURE_MODEL_CHAT_ANALYSIS_ENGINE if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_ANALYSIS_ENGINE
 
 # -----------------------------
 # Helpers: schemas + prompts
@@ -121,11 +125,11 @@ def _should_rerun(prev_rec: Optional[Dict[str, Any]]) -> bool:
 # Core runner
 # -----------------------------
 
-async def analyze_transcription_questions(
+async def async_analyze_transcription_questions(
     request_json: str | Dict[str, Any],
     *,
-    model: str = "gpt-4o-mini",
-    parallel_requests: int = 8,
+    model: str = "",
+    parallel_requests: int = None,
     prev_result: Optional[Dict[str, Any]] = None,
     timeout: float = 120.0,
 ) -> Tuple[Dict[str, Any], bool]:
@@ -145,6 +149,11 @@ async def analyze_transcription_questions(
     """
     # Parse input
     req: Dict[str, Any] = json.loads(request_json) if isinstance(request_json, str) else dict(request_json)
+
+    if not model:
+        model = _default_analysis_model()
+    if not parallel_requests or parallel_requests < 1:
+        parallel_requests = settings.TR_ANALYSIS_PARALLEL_REQUESTS  # default value
 
     system_id = req.get("systemId")
     request_id = req.get("requestId")

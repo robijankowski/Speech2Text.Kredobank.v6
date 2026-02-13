@@ -17,7 +17,6 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 
 from core.config import settings
-from transcribe.core.tr_config import tr_settings
 
 from transcribe.utilities.transcribe_stereo_tools import (
     transcript_audio_file_verbose_o4_single_channel,
@@ -58,7 +57,7 @@ from transcribe.utilities.transcribe_mono_tools import (
     classify_all_speakers_agent_or_client
 )
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 def _default_asr_model() -> str:

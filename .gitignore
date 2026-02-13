@@ -22,3 +22,7 @@ users.json
 /data/embeddings_all.emb
 *.mp3
 /transcriptions
+/transcribe_logs 
+/admin_console_logs 
+/analyzer_logs 
+/temp1 

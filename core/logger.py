@@ -10,6 +10,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
+from core.config import settings
+
 
 @dataclass(frozen=True)
 class LogConfig:
@@ -55,7 +57,7 @@ class _StreamToLogger(io.TextIOBase):
         self._buf = ""
 
 
-def setup_logger(cfg: LogConfig) -> logging.Logger:
+def setup_logger() -> logging.Logger:
     """
     Creates a robust logger:
     - INFO/DEBUG/etc
@@ -64,6 +66,14 @@ def setup_logger(cfg: LogConfig) -> logging.Logger:
     - optional separate error log
     - optional capture of print() + warnings + uncaught exceptions
     """
+
+    cfg = LogConfig(
+        log_dir=settings.TRANSCRIBE_LOGS_DIR,
+        base_filename=settings.TRANSCRIBE_LOGS_PREF,
+        level=logging.DEBUG,
+        logger_name=settings.TR_LOGGER_NAME
+    )
+    
     log_dir = Path(cfg.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 

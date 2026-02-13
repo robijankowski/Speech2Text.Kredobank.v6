@@ -1,0 +1,7 @@
+TR_LOGGER_NAME="transcribe"
+
+TR_TEMP_ROOT_DIR="./temp/"
+
+TR_EVALUATION_CONFIGS_ROOT="./transcribe/evaluation_configs"
+
+TR_ANALYSIS_PARALLEL_REQUESTS=3

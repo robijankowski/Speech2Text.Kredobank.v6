@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from openai_tools.openai_client_text import chat_completion_with_format  
 
@@ -47,6 +47,9 @@ def _read_text(path: Path) -> str:
 def _read_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
+def _default_evaluation_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_CHAT_SCORE if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_SCORE
 
 
 def load_scheme(
@@ -134,6 +137,7 @@ def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: st
     # log.debug(f"User prompt for check '{check.id}': {user_prompt}") 
     # log.debug(f"System prompt for check '{check.id}': {system_prompt}")
 
+    log.info(f"Started evaluation check '{check.id}' with model: '{model}'")
     completion = chat_completion_with_format(
         messages=[
             {"role": "system", "content": system_prompt},
@@ -145,7 +149,7 @@ def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: st
         schema_name=check.schema_name,
     )
     log.info(f"Executed evaluation check '{check.id}' with model: '{model}'")
-    log.info("\n"+str(completion.usage))
+    # log.info("\n"+str(completion.usage))
 
     log.debug(f"Check '{check.id}' completion: {completion}")
 
@@ -247,7 +251,7 @@ def run_scheme(
                        (but already computed details are returned)
     """
     if not model_override:
-        model = settings.AZURE_MODEL_CHAT_ANALYSIS_ENGINE if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_ANALYSIS_ENGINE
+        model = _default_evaluation_model()
     else:
         model = model_override
 

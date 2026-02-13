@@ -1,8 +1,13 @@
 from core.config import settings
 import logging
-from transcribe.core.tr_config import tr_settings
+from core.config import settings
 
-log = logging.getLogger(tr_settings.TR_LOGGER_NAME)
+log = logging.getLogger(settings.TR_LOGGER_NAME)
+
+def _default_summary_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_CHAT_SUMMARY if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_SUMMARY    
+
 
 
 from openai_tools.openai_client_text import chat_completion
@@ -137,8 +142,8 @@ TRANSCRIPT TO ANALYZE:
 
 
 
-def generate_crm_summary_o4(transcript_text, 
-                            model="") -> str:
+def generate_crm_summary_for_call_scenario(transcript_text: str, 
+                                            model: str = "") -> str:
     """
     Generate a structured CRM summary from a conversation transcript (in Ukrainian).
     
@@ -154,7 +159,7 @@ def generate_crm_summary_o4(transcript_text,
     user_prompt = USER_PROMPT.format(transcript_text=transcript_text or "")
 
     if not model:
-        model = settings.AZURE_MODEL_CHAT_SUMMARY if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_SUMMARY
+        model = _default_summary_model()
 
     response = chat_completion(
         model=model,    
@@ -164,7 +169,7 @@ def generate_crm_summary_o4(transcript_text,
         )
     
     log.info(f"Summary generated with model: {model}:")
-    log.info("\n" + str(response.usage))   
+    # log.info("\n" + str(response.usage))   
 
     return response.choices[0].message.content
 
