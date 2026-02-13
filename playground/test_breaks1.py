@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 # Twoje moduły z projektu:
 from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
-from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_single_channel
+from transcribe.utilities.transcribe_stereo_tools import transcript_audio_file_verbose_o4_single_channel
 from openai import OpenAI
 
 

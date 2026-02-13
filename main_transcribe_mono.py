@@ -19,7 +19,7 @@ from pydub.effects import normalize
 from core.config import settings
 from transcribe.core.tr_config import tr_settings
 
-from transcribe.utilities.transcribe_stereo import (
+from transcribe.utilities.transcribe_stereo_tools import (
     transcript_audio_file_verbose_o4_single_channel,
     transcript_audio_file_verbose_o4_stereo,
 )

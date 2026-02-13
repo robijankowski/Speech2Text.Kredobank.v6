@@ -1,1 +1,1 @@
-classify_all_speakers_agent_or_client
+azure_endpoint

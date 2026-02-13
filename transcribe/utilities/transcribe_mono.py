@@ -19,7 +19,7 @@ from pydub.effects import normalize
 from core.config import settings
 from transcribe.core.tr_config import tr_settings
 
-from transcribe.utilities.transcribe_stereo import (
+from transcribe.utilities.transcribe_stereo_tools import (
     transcript_audio_file_verbose_o4_single_channel,
     transcript_audio_file_verbose_o4_stereo,
 )
@@ -1013,10 +1013,10 @@ def consolidate_consecutive_roles_text(
 # Main wrapper: MONO -> scenario
 # -----------------------------
 
-def transcribe_mono_to_scenario(
+def transcribe_mono_audio_file_to_scenario(
     *,
     source_file: str,
-    temp_dir: str,
+    temp_root_dir: str,
     metadata: Any = None,
     temperature: float = 0.0,
     timeout: float = 120.0,
@@ -1028,7 +1028,7 @@ def transcribe_mono_to_scenario(
     End-to-end MONO pipeline:
       preprocess -> diarized transcription -> (optional refine) -> role map -> scenario
     """
-    mono_cleaned = prepare_audio_for_transcription_mono(source_file=source_file, temp_dir=temp_dir)
+    mono_cleaned = prepare_audio_for_transcription_mono(source_file=source_file, temp_dir=temp_root_dir)
 
     diar = transcribe_mono_diarized(
         mono_file_cleaned=mono_cleaned,
@@ -1050,7 +1050,7 @@ def transcribe_mono_to_scenario(
         diar_segs = enhance_segments_with_virtual_channels(
             mono_file_cleaned=mono_cleaned,
             diarized_segments=diar_segs,
-            temp_dir=temp_dir,
+            temp_dir=temp_root_dir,
             metadata=metadata,
             keep_silence_ms=keep_silence_ms,
         )
@@ -1073,90 +1073,6 @@ def transcribe_mono_to_scenario(
     return scenario
 
 
-# -----------------------------
-# Universal wrapper: AUTO stereo/mono -> scenario
-# -----------------------------
-
-def transcribe_file_to_scenario(
-    *,
-    source_file: str,
-    temp_dir: str,
-    metadata: Any = None,
-    temperature: float = 0.0,
-    timeout: float = 120.0,
-    force_mono: bool = False,
-) -> str:
-    """
-    One entry point for your app:
-      - If stereo and not force_mono -> use your existing stereo pipeline
-      - Else -> mono pipeline above
-    """
-    audio = AudioSegment.from_file(source_file)
-    is_stereo = (audio.channels == 2)
-
-    if is_stereo and not force_mono:
-        # Existing stereo pipeline (same as main_transcribe_openai)
-        l_file, r_file, org_file = prepare_audio_for_transcription(source_file, temp_dir)
-
-        o4_left = transcript_audio_file_verbose_o4_single_channel(
-            l_file,
-            o4_metadata_text=_to_str_metadata(metadata),
-            temperature=temperature,
-        )
-        o4_right = transcript_audio_file_verbose_o4_single_channel(
-            r_file,
-            o4_metadata_text=_to_str_metadata(metadata),
-            temperature=temperature,
-        )
-        o4_full = transcript_audio_file_verbose_o4_stereo(
-            org_file,
-            o4_metadata_text=_to_str_metadata(metadata),
-            temperature=temperature,
-        )
-
-        agent_text, client_text = detect_speaker_roles(o4_left.text, o4_right.text)
-        agent_text = add_prefix_to_sentences(agent_text, "AG:")
-        client_text = add_prefix_to_sentences(client_text, "CL:")
-
-        scenario_granular = split_transcription_into_roles_4o(
-            agent_text=agent_text,
-            client_text=client_text,
-            stereo_text=o4_full.text,
-        )
-        return consolidate_dialogue(scenario_granular)
-
-    # mono path
-    return transcribe_mono_to_scenario(
-        source_file=source_file,
-        temp_dir=temp_dir,
-        metadata=metadata,
-        temperature=temperature,
-        timeout=timeout,
-        enhance_with_virtual_channels=True,
-    )
 
 
 
-O4_METADATA = [
-    {"clientName": "Ivolo Olena Volodymyrivna", "agentName": "Ulyana", "bankName": "KredoBank Ukraine"},
-    {"name": "Lukashchuk Serhii Mykolayivych", "agentName": "Sviatoslav", "bankName": "KredoBank Ukraine"},
-    {},
-    {"agentName": "Ivanova", "bankName": "KredoBank Ukraine"},
-    {}
-]
-
-
-
-
-
-
-
-
-
-scenario = transcribe_file_to_scenario(
-    source_file="./test/test_call_mono.wav",
-    temp_dir=tr_settings.TR_TEMP_ROOT_DIR,
-    metadata=O4_METADATA[0]
-)
-
-print(scenario)

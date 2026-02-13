@@ -1,5 +1,5 @@
 
-from transcribe.utilities.transcribe_stereo import transcript_audio_file_verbose_o4_stereo, transcript_audio_file_verbose_o4_single_channel
+from transcribe.utilities.transcribe_stereo_tools import transcript_audio_file_verbose_o4_stereo, transcript_audio_file_verbose_o4_single_channel
 
 
 def process_stereo_with_o4(left_file_cleaned: str, 

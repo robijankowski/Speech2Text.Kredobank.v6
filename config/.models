@@ -12,6 +12,7 @@ OPENAI_MODEL_CHAT_SCORE="gpt-4o"
 OPENAI_MODEL_CHAT_ANALYSIS_ENGINE="gpt-4o-mini"
 
 
+# THIS is local model configuration (PS)
 AZURE_OPENAI_ENDPOINT="https://testkbazure.cognitiveservices.azure.com/"
 AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 
@@ -24,3 +25,19 @@ AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2-chat-azure-test"
 AZURE_MODEL_CHAT_SUMMARY="gpt-5-mini-azure-test"
 AZURE_MODEL_CHAT_SCORE="gpt-5-mini-azure-test"
 AZURE_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini-azure-test"
+
+
+
+# THIS is kredo model configuration
+# AZURE_OPENAI_ENDPOINT="https://trhol-m7u944jj-swedencentral.cognitiveservices.azure.com/"
+# AZURE_OPENAI_API_VERSION="2024-12-01-preview"
+
+# AZURE_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe"
+# AZURE_MODEL_TRANSCRIBE_DIARIZE="gpt-4o-transcribe-diarize"
+
+# AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-5.2"
+# AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2"
+
+# AZURE_MODEL_CHAT_SUMMARY="gpt-5-mini"
+# AZURE_MODEL_CHAT_SCORE="gpt-5-mini"
+# AZURE_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini"
