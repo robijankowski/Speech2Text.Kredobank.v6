@@ -1,1 +1,1 @@
-def detect_agent_interruptions_from_diarized_segments(
+classify_all_speakers_agent_or_client
