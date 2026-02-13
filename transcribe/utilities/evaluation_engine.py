@@ -5,14 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import logging
 from core.config import settings
+from core.logger import log
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from openai_tools.openai_client_text import chat_completion_with_format  
 
-from core.config import settings
 
 @dataclass(frozen=True)
 class CheckDef:

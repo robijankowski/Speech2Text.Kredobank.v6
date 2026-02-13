@@ -6,10 +6,8 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 import os
 
-import logging
 from core.config import settings
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import log
 
 
 from transcribe.utilities.noise_reduction import reduce_audio_noise

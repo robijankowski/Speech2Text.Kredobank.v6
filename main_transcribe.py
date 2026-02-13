@@ -1,14 +1,10 @@
-import os
 from datetime import  date
 import json
 import asyncio
 
-from typing import Any, Dict, Optional
-
 from core.config import settings
-
-from core.logger import setup_logger, shutdown_logger
-log = setup_logger()
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
 
 
 from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md, is_configuration_ok
@@ -32,10 +28,10 @@ AUDIO_FILES = [
 ]
 
 O4_METADATA = [
-    {"name": "Ivolo Olena Volodymyrivna", "agent": "Ulyana", "bank": "KredoBank Ukraine"},
-    {"name": "Ivolo Olena Volodymyrivna", "agent": "Ulyana", "bank": "KredoBank Ukraine"},
-    {"name": "Ivolo Olena Volodymyrivna", "agent": "Ulyana", "bank": "KredoBank Ukraine"},
-    {"name": "Lukashchuk Serhii Mykolayivych", "agent": "Sviatoslav", "bank": "KredoBank Ukraine"},
+    {"name": "Ivolo Olena Volodymyrivna", "agentName": "Ulyana", "bank": "KredoBank Ukraine"},
+    {"name": "Ivolo Olena Volodymyrivna", "agentName": "Ulyana", "bank": "KredoBank Ukraine"},
+    {"name": "Ivolo Olena Volodymyrivna", "agentName": "Ulyana", "bank": "KredoBank Ukraine"},
+    {"name": "Lukashchuk Serhii Mykolayivych", "agentName": "Sviatoslav", "bank": "KredoBank Ukraine"},
     {},
     {"agent": "Ivanova", "bank": "KredoBank Ukraine"},
     {}
@@ -149,37 +145,13 @@ SAMPLE_REQUEST_JSON = r'''{
 
 
 
-# async def async_test_analysis(scnenario: str, prev_result: Optional[Dict[str, Any]] = None):
-#     # First run (no prev_result)
-#     request = json.loads(SAMPLE_REQUEST_JSON)
-#     request["conversation"] = scnenario
-
-#     result, success = await async_run_analysis_of_the_transcription_pipeline(
-#         request_json=request,
-#         prev_result=prev_result
-#     )
-
-#     return result, success
-
-
 
 
 CALL_INFO = {"callType":"debt", "phoneType":"fin", "dpd":"dpd30"}
 CALL_DATE = date(2026, 1,15)
 SYSTEM_CODE = "kcc"
 
-# def print_settings_line_by_line(settings_obj) -> None:
-#     # pydantic v2
-#     if hasattr(settings_obj, "model_dump"):
-#         data = settings_obj.model_dump()
-#     # pydantic v1
-#     elif hasattr(settings_obj, "dict"):
-#         data = settings_obj.dict()
-#     else:
-#         data = vars(settings_obj)
 
-#     for k, v in data.items():
-#         print(f"{k} = {v}")
 
 def run_transcription(start_index=0, end_index=None):
     try:
@@ -218,6 +190,7 @@ def run_transcription(start_index=0, end_index=None):
                                                                     system_code=SYSTEM_CODE,
                                                                     call_date=CALL_DATE,
                                                                     call_info=CALL_INFO,
+                                                                    prev_result=None
                                                                     )
             log.info(f"Evaluation results {file_number} :\n{success}\nResult: {json.dumps(res, indent=2)}")
 
@@ -237,13 +210,8 @@ def run_transcription(start_index=0, end_index=None):
 
     finally:
         # Always close the logger and restore stdout
-        shutdown_logger(log)
+        shutdown_logger()
 
 # Run the main function
 if __name__ == "__main__":
-    # run_transcription(3,3)
-    # audio_file = "./test/test_call.wav"
-    # stereo_to_mono(audio_file, out_file=audio_file.replace(".wav", "_mono.wav"))
-
     run_transcription(0,0)  # Change indices to process specific files or ranges
-    # asyncio.run(async_test_analysis(scnenario=TEST_SCENARIO, prev_result=None))

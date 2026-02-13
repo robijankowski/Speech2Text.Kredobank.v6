@@ -1,7 +1,5 @@
-import logging
 from core.config import settings
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import log
 
 from openai_tools.openai_client_transcribe import transcribe_audio, Transcription
 

@@ -6,6 +6,9 @@ from openai import AzureOpenAI
 from contextlib import contextmanager
 
 from core.config import settings
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
+
 
 AudioInput = Union[str, Path, BinaryIO]
 
@@ -124,3 +127,4 @@ except httpx.HTTPStatusError as e:
     print(f"Request details: Endpoint: {azure_endpoint}\nApi version: {azure_api_version}\nDeployment: {model}\n")
 
 
+shutdown_logger()

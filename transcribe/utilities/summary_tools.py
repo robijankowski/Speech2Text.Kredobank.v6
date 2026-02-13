@@ -1,8 +1,6 @@
 from core.config import settings
-import logging
-from core.config import settings
+from core.logger import log
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 def _default_summary_model() -> str:
     # normal transcription model (NOT diarize)

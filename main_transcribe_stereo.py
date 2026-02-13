@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, date
-import logging
 import json
 from dataclasses import asdict
 import asyncio
@@ -9,15 +8,8 @@ from unittest import result
 from core.config import settings
 from openai_tools.openai_client_transcribe import Transcription
 
-from core.logger import setup_logger, shutdown_logger, LogConfig
-log_config = LogConfig(
-    log_dir=settings.TRANSCRIBE_LOGS_DIR,
-    base_filename=settings.TRANSCRIBE_LOGS_PREF,
-    level=logging.DEBUG,
-    logger_name=settings.TR_LOGGER_NAME
-)
-log = setup_logger(log_config)
-
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
 
 from transcribe.utilities.scenario_tools import split_transcription_into_roles_4o, format_scenario_md, consolidate_dialogue, detect_speaker_roles, add_prefix_to_sentences
 from transcribe.utilities.md_creator import create_documentation_md
@@ -297,7 +289,7 @@ def run_transcription(start_index=0, end_index=None):
 
     finally:
         # Always close the logger and restore stdout
-        shutdown_logger(log)
+        shutdown_logger()
 
 # Run the main function
 if __name__ == "__main__":

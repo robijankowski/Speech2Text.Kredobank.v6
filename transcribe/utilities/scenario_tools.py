@@ -2,11 +2,8 @@ import json
 import re
 
 from core.config import settings
+from core.logger import log
 
-import logging
-from core.config import settings
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 from transcribe.utilities.stats import set_stats
@@ -55,7 +52,7 @@ You are given three transcripts of a phone call between a KredoBank Ukraine agen
 
 Your task is to create a COMPLETE speaker-labeled conversation script that includes EVERY SINGLE PHRASE from the STEREO transcript with PERFECT speaker identification.
 
-Conversation Metadata:
+Conversation Metadata. Known entities canonical names:
 {metadata_text}
 
 Input Sources:

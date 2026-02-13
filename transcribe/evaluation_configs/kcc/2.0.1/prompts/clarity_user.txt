@@ -2,7 +2,7 @@ Evaluate ONLY the clarity and accuracy of communication in this Kredobank collec
 
 Transcript:
 """
-{transcript}
+<transcript>{transcript}</transcript>
 """
 
 Focus exclusively on how clearly and accurately the agent communicated information. Ignore all other aspects of the call such as opening procedures, negotiation tactics, or call resolution.

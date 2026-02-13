@@ -2,11 +2,7 @@ import json
 import re
 
 from core.config import settings
-
-import logging
-from core.config import settings
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import log
 
 from openai_tools.openai_client_text import  chat_completion_with_format
 from typing import Any, Dict, List, Tuple, Optional

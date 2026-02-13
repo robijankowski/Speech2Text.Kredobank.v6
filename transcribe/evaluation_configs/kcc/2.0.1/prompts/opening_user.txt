@@ -2,7 +2,7 @@ Evaluate ONLY the opening and verification aspects of this Kredobank collections
 
 Transcript:
 """
-{transcript}
+<transcript>{transcript}</transcript>
 """
 
 Focus exclusively on how well the agent handled the call opening and client verification. Ignore all other aspects of the call such as negotiation, payment handling, or call resolution.

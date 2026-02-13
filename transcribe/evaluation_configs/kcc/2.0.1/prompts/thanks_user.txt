@@ -2,10 +2,10 @@ Evaluate ONLY whether the agent thanked the client for the conversation/call.
 
 Call metadata:
 """
-{metadata}
+<metadata>{metadata}</metadata>
 """
 
 Transcript:
 """
-{transcript}
+<transcript>{transcript}</transcript>
 """

@@ -25,6 +25,8 @@ class AppSettings(BaseSettings):
     # ----------------------------- .config
     TRANSCRIBE_LOGS_DIR: str
     TRANSCRIBE_LOGS_PREF: str
+    TRANSCRIBE_LOGGER_NAME: str = "tlog"
+
     ANALYZER_LOGS_DIR: str
     ANALYZER_LOGS_PREF: str
     ADMIN_CONSOLE_LOGS_DIR: str
@@ -82,8 +84,6 @@ class AppSettings(BaseSettings):
 
     
     # ----------------------------- .models
-    TR_LOGGER_NAME: str
-
     TR_TEMP_ROOT_DIR: str
 
     TR_EVALUATION_CONFIGS_ROOT: str

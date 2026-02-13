@@ -6,6 +6,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.logger import log
 
 # --- optional JSONSchema validation (if installed) ---
 try:

@@ -6,10 +6,8 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence, detect_nonsilent
 
 
-import logging
 from core.config import settings
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import log
 
 
 

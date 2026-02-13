@@ -1,6 +1,5 @@
-import logging
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
 
 from core.config import settings
 from transcribe.utilities.o4_transcribe_diarized import transcript_audio_file_verbose_o4_diarize

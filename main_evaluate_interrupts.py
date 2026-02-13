@@ -3,6 +3,9 @@ from __future__ import annotations
 from core.config import settings
 from transcribe.utilities.evaluation_interrupts import detect_agent_interruptions
 
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
+
 if __name__ == "__main__":
     files = [
         "./test/Одночасна розмова фахівця і клієнта.wav",
@@ -20,3 +23,4 @@ if __name__ == "__main__":
         print(f"\n\n\n#########################\nFILE: '{f}'\n#########################")
         res = detect_agent_interruptions( f )
         print("\nResult:", res)
+    shutdown_logger()  # ensure all logs flushed and file handlers closed

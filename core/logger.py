@@ -71,7 +71,7 @@ def setup_logger() -> logging.Logger:
         log_dir=settings.TRANSCRIBE_LOGS_DIR,
         base_filename=settings.TRANSCRIBE_LOGS_PREF,
         level=logging.DEBUG,
-        logger_name=settings.TR_LOGGER_NAME
+        logger_name=settings.TRANSCRIBE_LOGGER_NAME
     )
     
     log_dir = Path(cfg.log_dir)
@@ -112,7 +112,8 @@ def setup_logger() -> logging.Logger:
         err_handler.setLevel(logging.ERROR)
 
     fmt = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)s | %(name)s | %(module)s:%(lineno)d | %(message)s",
+        # fmt="%(asctime)s | %(levelname)s | %(name)s | %(module)s:%(lineno)d | %(message)s",
+        fmt="%(asctime)s | %(levelname)s | %(module)s:%(lineno)d | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     file_handler.setFormatter(fmt)
@@ -151,7 +152,7 @@ def setup_logger() -> logging.Logger:
     return logger
 
 
-def shutdown_logger(logger: logging.Logger) -> None:
+def _shutdown_logger(logger: logging.Logger) -> None:
     """
     Flush and close handlers + restore stdout/stderr.
     """
@@ -167,3 +168,33 @@ def shutdown_logger(logger: logging.Logger) -> None:
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
         setattr(logger, "_kredo_configured", False)
+
+def shutdown_logger() -> None:
+    global _LOGGER
+    if _LOGGER is not None:
+        _shutdown_logger(_LOGGER)
+        _LOGGER = None
+
+
+_LOGGER: logging.Logger | None = None
+
+
+
+def get_logger(module_name: str | None = None) -> logging.Logger:
+    """
+    Returns configured logger. Safe to call from any module.
+    If module_name is provided, returns a child logger:
+      kredo_transcribe.<module_name>
+    """
+    global _LOGGER
+    if _LOGGER is None:
+        _LOGGER = setup_logger()  # idempotent because of _kredo_configured guard
+
+    if module_name:
+        # Child logger inherits handlers via propagation to parent name.
+        return logging.getLogger(f"{_LOGGER.name}.{module_name}")
+
+    return _LOGGER
+
+
+log = get_logger()

@@ -9,9 +9,7 @@ import json
 from pydub import AudioSegment
 
 from core.config import settings
-import logging
-
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import log
 
 from transcribe.utilities.summary_tools import generate_crm_summary_for_call_scenario
 from transcribe.utilities.transcribe_mono import transcribe_mono_audio_file_to_scenario

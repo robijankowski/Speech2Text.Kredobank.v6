@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import shutil
 import re
@@ -29,14 +28,11 @@ from transcribe.utilities.scenario_tools import (
 
 from openai_tools.openai_client_text import (
     chat_completion_with_format,
-    async_chat_completion_with_format,
 )
 
 from openai_tools.openai_client_transcribe import (
     transcribe_audio,
     transcribe_audio_diarized,
-    async_transcribe_audio,
-    async_transcribe_audio_diarized,
     Transcription,
 )
 
@@ -57,7 +53,8 @@ from transcribe.utilities.transcribe_mono_tools import (
     classify_all_speakers_agent_or_client
 )
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
+from core.logger import get_logger, shutdown_logger
+log = get_logger(__name__)
 
 
 def _default_asr_model() -> str:

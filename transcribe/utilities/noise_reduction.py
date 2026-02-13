@@ -3,14 +3,10 @@ import librosa
 import soundfile as sf
 import noisereduce as nr
 import numpy as np
-from pydub import AudioSegment
 
-
-
-import logging
 from core.config import settings
+from core.logger import log
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 

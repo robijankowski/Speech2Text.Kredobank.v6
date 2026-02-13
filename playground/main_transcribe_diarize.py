@@ -83,10 +83,6 @@ def run_transcription(start_index=0, end_index=None):
     transcriptions_dir = "./transcriptions"
     os.makedirs(transcriptions_dir, exist_ok=True)
     
-    # Set up logging
-    log_file_path = os.path.join(transcriptions_dir, f"{timestamp}log.txt")
-    logger = Logger(log_file_path)
-    sys.stdout = logger
     
     try:
         file_number = start_index

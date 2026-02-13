@@ -1,11 +1,10 @@
 from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-import logging
 
 from core.config import settings
+from core.logger import log
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 
 from transcribe.utilities.scenario_tools import ( split_transcription_into_roles_4o, 

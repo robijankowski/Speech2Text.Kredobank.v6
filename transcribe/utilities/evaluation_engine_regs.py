@@ -6,10 +6,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
-import logging
 from core.config import settings
+from core.logger import log
 
-log = logging.getLogger(settings.TR_LOGGER_NAME)
 
 from transcribe.utilities.evaluation_engine import load_scheme, SchemeDef
 
