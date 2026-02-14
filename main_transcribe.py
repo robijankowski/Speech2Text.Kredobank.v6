@@ -159,7 +159,7 @@ def run_transcription(start_index=0, end_index=None):
         print(format_audit_report_md(reports))
         print(f"Is configuration OK? {is_configuration_ok(reports)} ")
 
-        settings.USE_AZURE_OPENAI = "Y"  # Change to "Y" to use Azure OpenAI for analysis
+        # settings.USE_AZURE_OPENAI = "Y"  # Change to "Y" to use Azure OpenAI for analysis
 
         file_number = start_index
         if end_index is None:
