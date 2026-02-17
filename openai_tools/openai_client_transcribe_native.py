@@ -11,7 +11,7 @@ from openai import AsyncOpenAI, OpenAI
 from openai.types.audio import Transcription
 
 from core.config import settings
-
+from core.logger import log
 
 AudioInput = Union[str, Path, BinaryIO]
 
@@ -80,10 +80,13 @@ def transcribe_audio_native(
     """
     model = model or _default_transcribe_model()
 
-    ts = _normalize_timestamp_granularities(timestamp_granularities)
-    if ts and response_format != "json":
-        response_format = "json"
 
+    ts = _normalize_timestamp_granularities(timestamp_granularities)
+    # # If timestamps are requested, OpenAI requires verbose_json
+    # if ts:
+    #     response_format = "verbose_json"
+
+    log.info(f"Started transcribing '{str(audio)}' using native model: {model}")
     with _open_audio(audio) as audio_file:
         return _openai_transcribe_client.audio.transcriptions.create(
             file=audio_file,
@@ -121,8 +124,10 @@ async def async_transcribe_audio_native(
     model = model or _default_transcribe_model()
 
     ts = _normalize_timestamp_granularities(timestamp_granularities)
-    if ts and response_format != "json":
-        response_format = "json"
+    # # If timestamps are requested, OpenAI requires verbose_json
+    # if ts:
+    #     response_format = "verbose_json"
+    log.info(f"Started async transcribing '{str(audio)}' using native model: {model}")
 
     with _open_audio(audio) as audio_file:
         return await _async_openai_transcribe_client.audio.transcriptions.create(
@@ -163,14 +168,14 @@ def transcribe_audio_native_diarized(
     chunking_strategy: str = "auto",
     timeout: float = 120.0,
     **kwargs: Any,
-) -> Any:
+) -> Transcription:
     """
     Sync native diarized transcription wrapper (with retries).
     Uses response_format="diarized_json".
     """
     model = model or _default_transcribe_diarize_model()
 
-    print(f"Transcribe '{str(audio)}' using native diarize model: {model}")
+    log.info(f"Started transcribing '{str(audio)}' using native model: {model}")
 
     with _open_audio(audio) as audio_file:
         return _openai_transcribe_client.audio.transcriptions.create(
@@ -184,6 +189,46 @@ def transcribe_audio_native_diarized(
             timeout=timeout,
             **kwargs,
         )
+
+
+
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+def transcribe_audio_native_whisper(
+    *,
+    audio: AudioInput,
+    model: Optional[str] = None,
+    language: Optional[str] = None,
+    prompt: Optional[str] = None,
+    temperature: float = 0.0,
+    response_format: str = "verbose_json",   # json | verbose_json | text | srt | vtt
+    timeout: float = 120.0,
+    **kwargs: Any,
+) -> Transcription:
+    """
+    Sync native Whisper transcription wrapper (with retries).
+    No diarization support.
+    """
+
+    model = model or "whisper-1"
+
+    log.info(f"Started transcribing '{str(audio)}' using native model: {model}")
+
+    with _open_audio(audio) as audio_file:
+        return _openai_transcribe_client.audio.transcriptions.create(
+            file=audio_file,
+            model=model,
+            language=language,
+            prompt=prompt,
+            temperature=temperature,
+            response_format=response_format,
+            timeout=timeout,
+            **kwargs,
+        )
+
 
 
 @retry(
@@ -207,6 +252,8 @@ async def async_transcribe_audio_native_diarized(
     Uses response_format="diarized_json".
     """
     model = model or _default_transcribe_diarize_model()
+
+    log.info(f"Started async transcribing  '{str(audio)}' using native model: {model}")
 
     with _open_audio(audio) as audio_file:
         return await _async_openai_transcribe_client.audio.transcriptions.create(

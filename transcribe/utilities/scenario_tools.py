@@ -1,10 +1,16 @@
 import json
 import re
+from dataclasses import dataclass
 
 from core.config import settings
 from core.logger import log
 
-
+@dataclass(frozen=True)
+class Turn:
+    role: str  # "AG" | "CL"
+    start: float
+    end: float
+    text: str
 
 from transcribe.utilities.stats import set_stats
 from openai_tools.openai_token_utilities import num_tokens_from_text
@@ -214,7 +220,8 @@ Classify each text as either AGENT or CLIENT."""
     log.info("\n" + str(response.usage))   
 
     result = json.loads(response.choices[0].message.content)
-
+    print(f"Speaker detection result: {result}")
+    
     agent_text = text1 if result['text1_speaker'] == 'AGENT' else text2
     client_text = text2 if result['text2_speaker'] == 'CLIENT' else text1
 
@@ -329,8 +336,8 @@ SCHEMA_SINGLE_SPEAKER_ROLE = {
 def classify_agent_or_client_prefix(text: str, model: str = "") -> str:
     """
     Classify a single transcript text block as AGENT or CLIENT and return prefix:
-      - 'AG:' if agent
-      - 'CL:' if client
+      - 'AGENT' if agent
+      - 'CLIENT' if client
     """
     system_prompt = (
         "You are an expert at analyzing bank call transcripts and identifying whether the speaker "
@@ -370,4 +377,5 @@ Return only the structured classification.
     )
 
     result = json.loads(resp.choices[0].message.content)
+    return result["speaker"]
     return "AG" if result["speaker"] == "AGENT" else "CL"

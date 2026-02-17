@@ -240,6 +240,7 @@ def run_scheme(
     scheme: SchemeDef,
     model_override: Optional[str] = None,
     prev_result: Optional[Dict[str, Any]] = None,
+    interrupts_analysis: Optional[Dict[str, Any]] = None
 ) -> Tuple[Dict[str, Any], bool]:
     """
     Returns: (result, success)
@@ -274,6 +275,14 @@ def run_scheme(
     partial_weighted = 0.0
     partial_weighted_max = 0.0
 
+    if interrupts_analysis:
+        details.append(interrupts_analysis)
+        ws = interrupts_analysis.get("weighted_score")
+        wm = interrupts_analysis.get("weighted_max")
+        if isinstance(ws, (int, float)) and isinstance(wm, (int, float)):
+            partial_weighted += float(ws)
+            partial_weighted_max += float(wm)
+
     for chk in scheme_checks:
         reused: Optional[Dict[str, Any]] = None
 
@@ -304,6 +313,8 @@ def run_scheme(
         if isinstance(ws, (int, float)) and isinstance(wm, (int, float)):
             partial_weighted += float(ws)
             partial_weighted_max += float(wm)
+
+
 
     result: Dict[str, Any] = {
         "system_code": scheme.system_code,

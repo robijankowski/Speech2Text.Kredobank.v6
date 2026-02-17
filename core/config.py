@@ -90,7 +90,7 @@ class AppSettings(BaseSettings):
 
     TR_ANALYSIS_PARALLEL_REQUESTS: int
 
-
+    TR_EVALUATE_INTERRUPTS: str
 
     # Pydantic v2 replacement for class Config
     model_config = SettingsConfigDict(
