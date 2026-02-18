@@ -83,7 +83,7 @@ class AppSettings(BaseSettings):
     AZURE_MODEL_CHAT_ANALYSIS_ENGINE: str
 
     
-    # ----------------------------- .models
+    # ----------------------------- .tr_config
     TR_TEMP_ROOT_DIR: str
 
     TR_EVALUATION_CONFIGS_ROOT: str

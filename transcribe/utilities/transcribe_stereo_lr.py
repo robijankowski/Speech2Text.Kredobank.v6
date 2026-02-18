@@ -14,12 +14,13 @@ from pydub import AudioSegment
 from core.config import settings
 from core.logger import log
 
-from openai_tools.openai_client_transcribe_native import (
-    transcribe_audio_native,
-    transcribe_audio_native_diarized,
+from openai_tools.openai_client_transcribe import (
+    async_transcribe_audio,
+    async_transcribe_audio_diarized,
 )
-from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
-from transcribe.utilities.scenario_tools import classify_agent_or_client_prefix, Turn
+
+from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean_lr
+from transcribe.utilities.scenario_tools import async_classify_agent_or_client_prefix, Turn
 
 AudioInput = Union[str, Path, BinaryIO]
 
@@ -154,7 +155,7 @@ def _extract_segments(obj: Any) -> List[Any]:
 
 
 
-def o4_bounds_from_o4_words(
+async def async_o4_bounds_from_o4_words(
     wav_path: str,
     language: str = "uk",
     temperature: float = 0.0,
@@ -178,7 +179,7 @@ def o4_bounds_from_o4_words(
 
     Output bounds are "tight" (no padding). All padding is handled later in slice_wav(... pad_ms=...).
     """
-    res = transcribe_audio_native_diarized(
+    res = await async_transcribe_audio_diarized(
         audio=wav_path,
         language=language,
         temperature=temperature,
@@ -313,7 +314,7 @@ def extend_chunk_ends(
     return out
 
 
-def transcribe_channel_by_bounds(
+async def async_transcribe_channel_by_bounds(
     channel_wav: str,
     role: str,
     language: str = "uk",
@@ -323,7 +324,7 @@ def transcribe_channel_by_bounds(
 ) -> List[Turn]:
 
     # Tight bounds (these are the timestamps you want in the final output)
-    bounds = o4_bounds_from_o4_words(channel_wav)
+    bounds = await async_o4_bounds_from_o4_words(channel_wav)
 
     # Extended bounds only for slicing audio (extra context to avoid cut sentences)
     pad_s = chunk_pad_ms / 1000.0
@@ -367,7 +368,7 @@ def transcribe_channel_by_bounds(
         # if prev_context:
         #     prompt += f"Previous context (for continuity; it may repeat naturally): {prev_context}\n"
 
-        tr = transcribe_audio_native(
+        tr = await async_transcribe_audio(
             audio=chunk_path,
             model="gpt-4o-transcribe",
             language=language,
@@ -385,7 +386,7 @@ def transcribe_channel_by_bounds(
     return out
 
 
-def transcribe_stereo_high_accuracy_with_timestamps(
+async def async_transcribe_stereo_high_accuracy_with_timestamps(
     left_wav: str,
     right_wav: str,
     language: str = "uk",
@@ -399,7 +400,7 @@ def transcribe_stereo_high_accuracy_with_timestamps(
     bounds_method controls how speech segments are detected (diarize/VAD/whisper-segments).
     """
 
-    a_turns = transcribe_channel_by_bounds(
+    a_turns = await async_transcribe_channel_by_bounds(
         channel_wav=left_wav,
         role="A",
         language=language,
@@ -408,7 +409,7 @@ def transcribe_stereo_high_accuracy_with_timestamps(
         metadata=metadata
     )
 
-    b_turns = transcribe_channel_by_bounds(
+    b_turns = await async_transcribe_channel_by_bounds(
         right_wav,
         role="B",
         language=language,
@@ -418,7 +419,7 @@ def transcribe_stereo_high_accuracy_with_timestamps(
     )
     
     a_text = render_timestamped_script(a_turns, timestamp_on=False)
-    a_role_res = classify_agent_or_client_prefix(a_text)
+    a_role_res = await async_classify_agent_or_client_prefix(a_text)
     log.info(f"\n=== Detected roles ===\n{a_role_res}") 
     if a_role_res == "AGENT":
         a_role, b_role = "AG", "CL"
@@ -441,7 +442,7 @@ def transcribe_stereo_high_accuracy_with_timestamps(
     return turns, script
 
 
-def transcribe_stereo_lr_timestamped(
+async def async_transcribe_stereo_lr_timestamped(
     *,
     source_file: str,
     temp_root_dir: Optional[str] = None,
@@ -464,10 +465,10 @@ def transcribe_stereo_lr_timestamped(
     shutil.copy2(src, dst)
 
     # 2) split + clean (normalize + 16k + NR) WITHOUT cutting silences
-    left_wav, right_wav = split_stereo_to_lr_and_clean(str(dst))
+    left_wav, right_wav = split_stereo_to_lr_and_clean_lr(str(dst))
     # left_wav, right_wav = process_stereo_recording2(str(dst))
 
-    turns, script = transcribe_stereo_high_accuracy_with_timestamps(
+    turns, script = await async_transcribe_stereo_high_accuracy_with_timestamps(
         left_wav,
         right_wav,
         language=language,

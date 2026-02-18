@@ -3,7 +3,7 @@ log = get_logger(__name__)
 
 from core.config import settings
 from transcribe.utilities.o4_transcribe_diarized import transcript_audio_file_verbose_o4_diarize
-from transcribe.utilities.scenario_tools import detect_speaker_roles
+from transcribe.utilities.scenario_tools import async_detect_speaker_roles
 import re
 
 
@@ -51,7 +51,7 @@ def transcribe_mono_with_diarization(
     speaker_1_text = speaker_texts.get("speaker_1", "")
 
     if speaker_0_text and speaker_1_text:
-        agent_text, client_text = detect_speaker_roles(speaker_0_text, speaker_1_text)
+        agent_text, client_text = async_detect_speaker_roles(speaker_0_text, speaker_1_text)
         log.info(f"\nSpeaker role mapping complete")
 
         role_map = {}

@@ -8,11 +8,13 @@ def _default_summary_model() -> str:
 
 
 
-from openai_tools.openai_client_text import chat_completion
+from openai_tools.openai_client_text import async_chat_completion
 
 
 SYSTEM_PROMPT = """
-You are a highly accurate CRM assistant for Kredobank, a Ukrainian bank. Your task is to analyze Ukrainian-language transcriptions of debt collection and customer service conversations between bank agents and clients, then generate structured summaries for the bank's CRM system.
+You are a highly accurate CRM assistant for Kredobank, a Ukrainian bank. 
+Your task is to analyze Ukrainian-language transcriptions of debt collection and customer service conversations between bank agents 
+and clients, then generate structured summaries for the bank's CRM system.
 
 CRITICAL REQUIREMENTS:
 - Be factually accurate - never add fictional information
@@ -39,6 +41,36 @@ Your response must follow this exact structure in Ukrainian:
 3. Відповідь та наміри клієнта
 4. Узгоджені дії
 5. Результат дзвінка
+"""
+
+
+
+SYSTEM_PROMPT = """
+You are a highly accurate CRM assistant for Kredobank, a Ukrainian bank. 
+Your task is to analyze Ukrainian-language transcriptions of debt collection and customer service conversations between bank agents 
+and clients, then generate structured summaries for the bank's CRM system.
+
+CRITICAL REQUIREMENTS:
+- Be factually accurate - never add fictional information
+- Preserve all names, dates, amounts, and account numbers exactly as stated
+- Clearly distinguish between what the agent said vs. what the client said
+- Identify who initiated each commitment or promise
+- Use professional, formal Ukrainian language in the output
+- Focus on actionable information and follow-up items
+
+CONVERSATION CONTEXT:
+These are typically debt collection calls where agents discuss:
+- Outstanding debts and payment schedules
+- Restructuring options
+- Asset inspections and property evaluations
+- Payment commitments and deadlines
+- Account restrictions or arrests
+- Insurance matters related to collateral
+
+OUTPUT STRUCTURE:
+Your response must follow this exact structure in Ukrainian:
+
+1. Короткий зміст розмови
 """
 
 USER_PROMPT = """
@@ -137,10 +169,26 @@ TRANSCRIPT TO ANALYZE:
 """
 
 
+USER_PROMPT = """
+Analyze this conversation transcript between a Kredobank agent and client, then create a structured CRM summary following the template below.
+
+ANALYSIS INSTRUCTIONS:
+
+1. КОРОТКИЙ ЗМІСТ РОЗМОВИ (Conversation Summary):
+- Write 2-3 sentences covering the main purpose and outcome
+- Include: loan/account type, outstanding amount, main discussion points
+- Mention any significant circumstances (car accident, factory damage, etc.)
+---
+
+TRANSCRIPT TO ANALYZE:
+{transcript_text}
+"""
 
 
 
-def generate_crm_summary_for_call_scenario(transcript_text: str, 
+
+
+async def async_generate_crm_summary_for_call_scenario(transcript_text: str, 
                                             model: str = "") -> str:
     """
     Generate a structured CRM summary from a conversation transcript (in Ukrainian).
@@ -159,7 +207,7 @@ def generate_crm_summary_for_call_scenario(transcript_text: str,
     if not model:
         model = _default_summary_model()
 
-    response = chat_completion(
+    response = await async_chat_completion(
         model=model,    
         temperature=0,
         messages=[{"role": "system", "content": system_prompt}, 

@@ -20,12 +20,12 @@ from core.logger import log
 
 
 from openai_tools.openai_client_text import (
-    chat_completion_with_format,
+    async_chat_completion_with_format,
 )
 
 from openai_tools.openai_client_transcribe import (
-    transcribe_audio,
-    transcribe_audio_diarized,
+    async_transcribe_audio,
+    async_transcribe_audio_diarized,
     Transcription,
 )
 
@@ -37,11 +37,11 @@ from transcribe.utilities.audio_tools import (
 
 # If you already use these in your pipeline, we reuse them to stay consistent
 from transcribe.utilities.scenario_tools import (
-    detect_speaker_roles,
+    async_detect_speaker_roles,
 )
 
 from transcribe.utilities.transcribe_mono_tools import (
-    classify_all_speakers_agent_or_client
+    async_classify_all_speakers_agent_or_client
 )
 
 def _default_asr_model() -> str:
@@ -205,7 +205,7 @@ def _validate_repaired_segments(
     return True
 
 
-def repair_diarized_segments_llm(
+async def async_repair_diarized_segments_llm(
     segs: List[DiarizedSeg],
     *,
     metadata: Any = None,
@@ -256,7 +256,7 @@ def repair_diarized_segments_llm(
         "Known entities canonical names: {metadata}"
     )
 
-    def _call_one(chunk: List[DiarizedSeg]) -> List[DiarizedSeg]:
+    async def _async_call_one(chunk: List[DiarizedSeg]) -> List[DiarizedSeg]:
         user = (
             f"Speakers: {allowed_speakers}\n"
             f"Metadata: {_to_str_metadata(metadata)}\n\n"
@@ -270,7 +270,7 @@ def repair_diarized_segments_llm(
         print("PROMPT TO LLM:\n", system + "\n\n" + user)
 
         model = _default_chat_model()
-        completion = chat_completion_with_format(
+        completion = await async_chat_completion_with_format(
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             model=model,
             temperature=temperature,
@@ -298,14 +298,14 @@ def repair_diarized_segments_llm(
 
     # Chunked repair for long calls
     if len(segs) <= chunk_size:
-        return _call_one(segs)
+        return await _async_call_one(segs)
 
     repaired_all: List[DiarizedSeg] = []
     i = 0
     while i < len(segs):
         j = min(len(segs), i + chunk_size)
         chunk = segs[i:j]
-        repaired_chunk = _call_one(chunk)
+        repaired_chunk = await _async_call_one(chunk)
 
         # avoid duplicating overlap region from previous chunk
         if repaired_all and overlap > 0:
@@ -321,7 +321,7 @@ def repair_diarized_segments_llm(
     return repaired_all
 
 
-def repair_diarized_segments(
+async def async_repair_diarized_segments(
     segs: List[DiarizedSeg],
     *,
     metadata: Any = None,
@@ -344,7 +344,7 @@ def repair_diarized_segments(
     noisy = flips_after >= max(10, int(len(pre) * 0.18))
     if force_llm or noisy or (flips_after > flips_before * 0.9):
         try:
-            return repair_diarized_segments_llm(pre, 
+            return await async_repair_diarized_segments_llm(pre, 
                                                 metadata=metadata, 
                                                 timeout=timeout)
         except Exception:
@@ -596,7 +596,7 @@ def prepare_audio_for_transcription_mono(
 # Transcription steps (mono)
 # -----------------------------
 
-def transcribe_mono_full(
+async def async_transcribe_mono_full(
     *,
     mono_file_cleaned: str,
     metadata: Any = None,
@@ -610,7 +610,7 @@ def transcribe_mono_full(
     prompt = MONO_CALL_PROMPT_UA.format(metadata=_to_str_metadata(metadata))
     model = _default_asr_model() 
 
-    tr = transcribe_audio(
+    tr = await async_transcribe_audio(
         audio=mono_file_cleaned,
         model=model,
         prompt=prompt,
@@ -623,7 +623,7 @@ def transcribe_mono_full(
     return tr
 
 
-def transcribe_mono_diarized(
+async def async_transcribe_mono_diarized(
     *,
     mono_file_cleaned: str,
     temperature: float = 0.0,
@@ -634,7 +634,7 @@ def transcribe_mono_diarized(
     Diarized mono transcription (speaker turns).
     """
     model = _default_diarize_model()
-    tr = transcribe_audio_diarized(
+    tr = await async_transcribe_audio_diarized(
         audio=mono_file_cleaned,
         model=model,
         temperature=temperature,
@@ -745,7 +745,7 @@ def parse_timestamped_segments(transcription: Any, speaker_id: str) -> List[Diar
     return out
 
 
-def transcribe_speaker_stream(
+async def async_transcribe_speaker_stream(
     *,
     speaker_wav: str,
     metadata: Any = None,
@@ -758,7 +758,7 @@ def transcribe_speaker_stream(
     prompt = SINGLE_CHANNEL_UNKNOWN_ROLE_PROMPT_EN.format(metadata=_to_str_metadata(metadata))
     
     model = _default_asr_model()
-    tr = transcribe_audio(
+    tr = await async_transcribe_audio(
         audio=speaker_wav,
         model=model,
         prompt=prompt,
@@ -770,7 +770,7 @@ def transcribe_speaker_stream(
     return tr
 
 
-def enhance_segments_with_virtual_channels(
+async def async_enhance_segments_with_virtual_channels(
     *,
     mono_file_cleaned: str,
     diarized_segments: List[DiarizedSeg],
@@ -805,7 +805,7 @@ def enhance_segments_with_virtual_channels(
             keep_silence_ms=keep_silence_ms,
         )
 
-        tr = transcribe_speaker_stream(
+        tr = await async_transcribe_speaker_stream(
             speaker_wav=speaker_wav,
             metadata=metadata,
         )
@@ -842,7 +842,7 @@ def _normalize_ws(s: str) -> str:
     return " ".join((s or "").split())
 
 
-def map_speaker_ids_to_roles(
+async def async_map_speaker_ids_to_roles(
     *,
     diarized_segments: List[DiarizedSeg],
 ) -> Dict[str, str]:
@@ -866,7 +866,7 @@ def map_speaker_ids_to_roles(
     t0 = " ".join(s.text for s in by[s0])
     t1 = " ".join(s.text for s in by[s1])
 
-    agent_text, client_text = detect_speaker_roles(t0, t1)
+    agent_text, client_text = await async_detect_speaker_roles(t0, t1)
 
     # detect_speaker_roles usually returns one of inputs (or near-identical).
     # We map by best whitespace-normalized containment.
@@ -996,7 +996,7 @@ def consolidate_consecutive_roles_text(
 # Main wrapper: MONO -> scenario
 # -----------------------------
 
-def transcribe_mono_audio_file_to_scenario(
+async def async_transcribe_mono_audio_file_to_scenario(
     *,
     source_file: str,
     temp_root_dir: str,
@@ -1013,7 +1013,7 @@ def transcribe_mono_audio_file_to_scenario(
     """
     mono_cleaned = prepare_audio_for_transcription_mono(source_file=source_file, temp_dir=temp_root_dir)
 
-    diar = transcribe_mono_diarized(
+    diar = await async_transcribe_mono_diarized(
         mono_file_cleaned=mono_cleaned,
         temperature=temperature,
         timeout=timeout,
@@ -1021,7 +1021,7 @@ def transcribe_mono_audio_file_to_scenario(
 
     print("\n\nDiarization result:", diar)
 
-    speaker_map = classify_all_speakers_agent_or_client(diar)
+    speaker_map = await async_classify_all_speakers_agent_or_client(diar)
     print("\n\nRole mapping:", speaker_map)
 
     # diar = relabel_diarized_speakers(diar, speaker_map=speaker_map, default_role="Agent")
@@ -1030,7 +1030,7 @@ def transcribe_mono_audio_file_to_scenario(
     print("\n\nParsed diarized segments:", diar_segs)
 
     if enhance_with_virtual_channels:
-        diar_segs = enhance_segments_with_virtual_channels(
+        diar_segs = await async_enhance_segments_with_virtual_channels(
             mono_file_cleaned=mono_cleaned,
             diarized_segments=diar_segs,
             temp_dir=temp_root_dir,
@@ -1040,7 +1040,7 @@ def transcribe_mono_audio_file_to_scenario(
         print("Enhanced diarized segments with virtual channels:", diar_segs)   
 
     if repair_with_llm:
-        diar_segs = repair_diarized_segments(
+        diar_segs = await async_repair_diarized_segments(
             diar_segs,
             metadata=metadata,
             timeout=timeout,

@@ -9,7 +9,7 @@ from core.config import settings
 from core.logger import log
 
 
-from openai_tools.openai_client_text import chat_completion_with_format  
+from openai_tools.openai_client_text import async_chat_completion_with_format  
 
 
 @dataclass(frozen=True)
@@ -124,7 +124,7 @@ def load_scheme(
     )
 
 
-def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: str) -> Dict[str, Any]:
+async def async_run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: str) -> Dict[str, Any]:
     """
     Runs ONE check and returns a normalized record for reporting.
     """
@@ -136,7 +136,7 @@ def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: st
     # log.debug(f"System prompt for check '{check.id}': {system_prompt}")
 
     log.info(f"Started evaluation check '{check.id}' with model: '{model}'")
-    completion = chat_completion_with_format(
+    completion = await async_chat_completion_with_format (
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -172,12 +172,6 @@ def run_check(*, transcript_text: str, metadata: str, check: CheckDef, model: st
 
 
 
-def _is_valid_int_score(val: Any) -> bool:
-    try:
-        int(val)
-        return True
-    except Exception:
-        return False
 
 
 def _normalize_prev_detail(*, prev: Dict[str, Any], chk: CheckDef) -> Optional[Dict[str, Any]]:
@@ -233,7 +227,7 @@ def _error_detail(*, chk: CheckDef, model: str, err: Exception) -> Dict[str, Any
 
 
 
-def run_scheme(
+async def async_run_scheme(
     *,
     transcript_text: str,
     metadata: str,
@@ -292,7 +286,7 @@ def run_scheme(
         if reused is None:
             try:
                 # raise Exception("Test exception for debugging")
-                rec = run_check(transcript_text=transcript_text, metadata=metadata, check=chk, model=model)
+                rec = await async_run_check(transcript_text=transcript_text, metadata=metadata, check=chk, model=model)
             except Exception as e:
                 had_error = True
                 log.exception(

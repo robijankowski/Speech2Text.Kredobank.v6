@@ -10,7 +10,7 @@ from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from core.config import settings
-
+from core.logger import log
 
 # --- clients (same style as openai_client_transcribe.py) ---
 openai_chat_client = OpenAI(
@@ -27,6 +27,13 @@ _async_openai_chat_client = AsyncOpenAI(
 )
 
 
+
+
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 def chat_completion_native(
     *,
     messages: Sequence[dict[str, Any]],
@@ -41,6 +48,7 @@ def chat_completion_native(
     """
     # Prefer a dedicated setting if you have it; otherwise fall back safely.
 
+    log.info(f"Calling native model: {model}")
     if model.startswith("gpt-5"):
         # Special handling for gpt-5 models if needed
         return openai_chat_client.chat.completions.create(
@@ -56,7 +64,6 @@ def chat_completion_native(
         timeout=timeout,
         **kwargs,
     )
-
 
 
 
@@ -77,7 +84,7 @@ async def async_chat_completion_native(
     Async chat.completions wrapper for scenario_tools (with retries).
     Returns the full ChatCompletion so callers can read `.usage`, `.choices`, etc.
     """
-
+    log.info(f"Calling async native model: {model}")
     if model.startswith("gpt-5"):
         # Special handling for gpt-5 models if needed
         return await _async_openai_chat_client.chat.completions.create(
@@ -95,10 +102,12 @@ async def async_chat_completion_native(
     )
 
 
-
-
-
-
+ 
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 def chat_completion_with_format_native(
     *,
     messages: Sequence[dict[str, Any]],
@@ -140,6 +149,8 @@ def chat_completion_with_format_native(
         }
     }
     
+    log.info(f"Calling native model with format: {model}")
+
     if model.startswith("gpt-5"):
         # Special handling for gpt-5 models if needed
         return openai_chat_client.chat.completions.create(
@@ -158,6 +169,7 @@ def chat_completion_with_format_native(
         timeout=timeout,
         **kwargs,
     )
+
 
 @retry(
     wait=wait_random_exponential(multiplier=1, min=1, max=40),
@@ -205,6 +217,8 @@ async def async_chat_completion_with_format_native(
         }
     }
     
+    log.info(f"Calling async native model with format: {model}")
+
     if model.startswith("gpt-5"):
         # Special handling for gpt-5 models if needed
         return await _async_openai_chat_client.chat.completions.create(

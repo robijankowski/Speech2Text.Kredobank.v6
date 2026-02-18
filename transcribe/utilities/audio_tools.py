@@ -108,7 +108,7 @@ def prepare_audio_for_transcription(source_file: str, temp_dir: str):
 
 
 
-def split_stereo_to_lr_and_clean1111111(stereo_file_path):
+def split_stereo_to_lr_and_clean(stereo_file_path):
     """
     Split a stereo WAV file into two mono files (left and right channels)
     Returns paths to the created mono files
@@ -153,7 +153,7 @@ def split_stereo_to_lr_and_clean1111111(stereo_file_path):
 
 
 
-def split_stereo_to_lr_and_clean(stereo_file_path: str):
+def split_stereo_to_lr_and_clean_lr(stereo_file_path: str):
     # ASR_AUDIO_PRESET = ASR_AUDIO_PRESET_HARD
     log.info(f"Processing stereo file: {stereo_file_path}")
     stereo_audio = AudioSegment.from_wav(stereo_file_path)
@@ -229,7 +229,7 @@ def split_stereo_to_lr_and_clean(stereo_file_path: str):
 
 
 
-def clean_audio_file1111111(input_file) -> str:
+def clean_audio_file(input_file) -> str:
     """
     Quick and simple cleanup for immediate use
     """
@@ -250,7 +250,7 @@ def clean_audio_file1111111(input_file) -> str:
     return output_file
 
 
-def clean_audio_file(input_file: str) -> str:
+def clean_audio_file_lr(input_file: str) -> str:
     log.info(f"Cleaning audio file: {input_file}")
     audio = AudioSegment.from_file(input_file)
     log.info(f"Loaded audio: {input_file}, duration: {len(audio)/1000:.2f}s, channels: {audio.channels}, frame_rate: {audio.frame_rate}Hz")

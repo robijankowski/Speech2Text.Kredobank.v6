@@ -10,7 +10,7 @@ from openai import AzureOpenAI, AsyncAzureOpenAI
 from openai.types.chat import ChatCompletion
 
 from core.config import settings
-
+from core.logger import log
 
 # Expected settings (add to your settings / env):
 # - AZURE_OPENAI_API_KEY
@@ -40,6 +40,11 @@ _async_azure_chat_client = AsyncAzureOpenAI(
 )
 
 
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 def chat_completion_azure(
     *,
     messages: Sequence[dict[str, Any]],
@@ -55,6 +60,7 @@ def chat_completion_azure(
     if not model:
         raise ValueError("model must be set to your Azure deployment name")
 
+    log.info(f"Calling AZURE model: {model}")
     # Keep your GPT-5 rule: don't send temperature for gpt-5 deployments (if your deployment is named 'gpt-5-*')
     if model.startswith("gpt-5"):
         return azure_chat_client.chat.completions.create(
@@ -92,6 +98,7 @@ async def async_chat_completion_azure(
     if not model:
         raise ValueError("model must be set to your Azure deployment name")
 
+    log.info(f"Calling async AZURE model: {model}")
     if model.startswith("gpt-5"):
         return await _async_azure_chat_client.chat.completions.create(
             model=model,
@@ -109,6 +116,11 @@ async def async_chat_completion_azure(
     )
 
 
+@retry(
+    wait=wait_random_exponential(multiplier=1, min=1, max=40),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 def chat_completion_with_format_azure(
     *,
     messages: Sequence[dict[str, Any]],
@@ -136,6 +148,7 @@ def chat_completion_with_format_azure(
         },
     }
 
+    log.info(f"Calling AZURE model with format: {model}")
     if model.startswith("gpt-5"):
         return azure_chat_client.chat.completions.create(
             model=model,
@@ -186,6 +199,8 @@ async def async_chat_completion_with_format_azure(
             "strict": True,
         },
     }
+
+    log.info(f"Calling async AZURE model with format: {model}")
 
     if model.startswith("gpt-5"):
         return await _async_azure_chat_client.chat.completions.create(

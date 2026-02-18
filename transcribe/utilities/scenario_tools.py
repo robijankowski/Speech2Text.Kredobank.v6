@@ -15,7 +15,7 @@ class Turn:
 from transcribe.utilities.stats import set_stats
 from openai_tools.openai_token_utilities import num_tokens_from_text
 
-from openai_tools.openai_client_text import chat_completion, async_chat_completion, chat_completion_with_format
+from openai_tools.openai_client_text import async_chat_completion, async_chat_completion_with_format
 
 
 def _default_detect_speaker_role_model() -> str:
@@ -28,7 +28,7 @@ def _default_split_into_roles_model() -> str:
     return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
 
 
-def split_transcription_into_roles_4o(agent_text, client_text, stereo_text, 
+async def async_split_transcription_into_roles_4o(agent_text, client_text, stereo_text, 
                                       metadata_text="", 
                                       model: str = "") -> str:
     SYSTEM_PROMPT = """
@@ -122,7 +122,7 @@ Do not include timestamps, metadata, or section headers. Output only the final r
     if not model:
         model = _default_split_into_roles_model()
 
-    response = chat_completion(
+    response = await async_chat_completion(
         model=model,    
         temperature=0,
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, 
@@ -168,7 +168,7 @@ SCHEMA_SPEAKER_DETECTION = {
 
 
 
-def detect_speaker_roles(text1: str, text2: str, model: str = "") -> dict:
+async def async_detect_speaker_roles(text1: str, text2: str, model: str = "") -> dict:
     """
     Detect which transcribed text belongs to the bank AGENT and which to the CLIENT.
     
@@ -208,7 +208,7 @@ Classify each text as either AGENT or CLIENT."""
         model = _default_detect_speaker_role_model()
 
     # Call the API with structured output
-    response = chat_completion_with_format(
+    response = await async_chat_completion_with_format(
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, 
                   {"role": "user", "content": USER_PROMPT}],      
         format_schema=SCHEMA_SPEAKER_DETECTION,
@@ -333,7 +333,7 @@ SCHEMA_SINGLE_SPEAKER_ROLE = {
 }
 
 
-def classify_agent_or_client_prefix(text: str, model: str = "") -> str:
+async def async_classify_agent_or_client_prefix(text: str, model: str = "") -> str:
     """
     Classify a single transcript text block as AGENT or CLIENT and return prefix:
       - 'AGENT' if agent
@@ -365,7 +365,7 @@ Return only the structured classification.
             else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
         )
 
-    resp = chat_completion_with_format(
+    resp = await async_chat_completion_with_format(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

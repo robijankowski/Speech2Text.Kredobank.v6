@@ -1,7 +1,7 @@
 from core.config import settings
 from core.logger import log
 
-from openai_tools.openai_client_transcribe import transcribe_audio, Transcription
+from openai_tools.openai_client_transcribe import async_transcribe_audio, Transcription
 
 from core.config import settings
 from transcribe.utilities.stats import set_stats
@@ -87,7 +87,7 @@ def _default_transcription_model() -> str:
 
 
 
-def transcript_audio_file_verbose_o4_single_channel(
+async def async_transcript_audio_file_verbose_o4_single_channel(
     file_name: str,
     o4_metadata_text: str = "",
     temperature: float = 0.0,
@@ -102,7 +102,7 @@ def transcript_audio_file_verbose_o4_single_channel(
     if not model:
         model = _default_transcription_model()
 
-    transcription = transcribe_audio(
+    transcription = await async_transcribe_audio(
         audio=file_name,
         model=model,
         prompt=prompt,
@@ -118,7 +118,7 @@ def transcript_audio_file_verbose_o4_single_channel(
 
 
 
-def transcript_audio_file_verbose_o4_stereo(file_name: str, 
+async def async_transcript_audio_file_verbose_o4_stereo(file_name: str, 
                                             o4_metadata_text="", 
                                             temperature=0.0,
                                             model: str = ""
@@ -129,7 +129,7 @@ def transcript_audio_file_verbose_o4_stereo(file_name: str,
     if not model:
         model = _default_transcription_model()
 
-    transcription = transcribe_audio(
+    transcription = await async_transcribe_audio(
         audio=file_name,
         model=model,
         prompt=prompt,

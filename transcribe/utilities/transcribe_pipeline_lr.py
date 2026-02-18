@@ -13,13 +13,14 @@ from core.logger import log
 
 from transcribe.utilities.scenario_tools import Turn
 
-from transcribe.utilities.summary_tools import generate_crm_summary_for_call_scenario
-from transcribe.utilities.transcribe_mono_lr import transcribe_mono_audio_file_to_scenario_lr
-from transcribe.utilities.transcribe_stereo_lr import transcribe_stereo_lr_timestamped
-from transcribe.utilities.evaluation_interrupts_lr import analyze_turn_overlaps_lr
+from transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario
+from transcribe.utilities.transcribe_mono_lr import async_transcribe_mono_audio_file_to_scenario_lr
+from transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_lr_timestamped
+from transcribe.utilities.evaluation_interrupts_lr import analyze_turn_overlaps_lr # no async need - just calc
+from transcribe.utilities.evaluation_engine import async_run_scheme
 
-from transcribe.utilities.evaluation_engine import run_scheme
-from transcribe.utilities.evaluation_engine_regs import load_active_scheme
+from transcribe.utilities.evaluation_engine_regs import load_active_scheme # no async need - just calc
+
 from transcribe.utilities.call_analysis_engine import async_analyze_transcription_questions
 
 
@@ -27,7 +28,7 @@ from transcribe.utilities.call_analysis_engine import async_analyze_transcriptio
 # -----------------------------
 # Universal wrapper: AUTO stereo/mono -> scenario
 # -----------------------------
-def transcribe_audio_file_to_scenario_pipeline_lr(
+async def async_transcribe_audio_file_to_scenario_pipeline_lr(
     *,
     source_file: str,
     metadata: Any = None,
@@ -48,14 +49,14 @@ def transcribe_audio_file_to_scenario_pipeline_lr(
         temp_root_dir = settings.TR_TEMP_ROOT_DIR
 
     if is_stereo and not force_mono:
-        return transcribe_stereo_lr_timestamped(source_file=source_file,
+        return await async_transcribe_stereo_lr_timestamped(source_file=source_file,
                                                         temp_root_dir=temp_root_dir,
                                                         metadata=metadata 
                                                         )
 
 
 
-    return transcribe_mono_audio_file_to_scenario_lr(  source_file=source_file,
+    return await async_transcribe_mono_audio_file_to_scenario_lr(  source_file=source_file,
                                                     temp_root_dir=temp_root_dir,
                                                     metadata=metadata,
                                                     temperature=temperature,
@@ -65,14 +66,14 @@ def transcribe_audio_file_to_scenario_pipeline_lr(
 
 
 
-def generate_scenario_summary_pipeline_lr(
+async def async_generate_scenario_summary_pipeline_lr(
     *,
     scenario: str, 
     model_override: str = None) -> str:
       
     log.info("\n\n\n" + "="*30 + " Generating summary " + "="*30)
-    summary = generate_crm_summary_for_call_scenario(scenario, model=model_override)
-    log.info("\n" + summary)
+    summary = await async_generate_crm_summary_for_call_scenario(scenario, model=model_override)
+    # log.info("\n" + str(summary))
     return summary
 
 
@@ -143,7 +144,7 @@ def evaluate_conversation_interrupts_pipeline_lr(
 
 
 
-def evaluate_transcripted_scenario_pipeline_lr(
+async def async_evaluate_transcripted_scenario_pipeline_lr(
     scenario: str,
     system_code: str,
     call_date: date,
@@ -182,7 +183,7 @@ def evaluate_transcripted_scenario_pipeline_lr(
     )
 
     log.info("\n\n" + "=" * 30 + "\nRunning evaluation scheme " + "=" * 30)
-    result, success = run_scheme(
+    result, success = await async_run_scheme(
         transcript_text=scenario,
         metadata=metadata_text,
         scheme=scheme,

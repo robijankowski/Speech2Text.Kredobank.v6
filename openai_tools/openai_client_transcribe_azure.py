@@ -206,6 +206,7 @@ def transcribe_audio_azure_diarized(
         )
 
 
+
 @retry(
     wait=wait_random_exponential(multiplier=1, min=1, max=40),
     stop=stop_after_attempt(3),

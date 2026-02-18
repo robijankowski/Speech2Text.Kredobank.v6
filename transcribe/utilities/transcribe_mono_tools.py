@@ -4,7 +4,7 @@ import re
 from core.config import settings
 from core.logger import log
 
-from openai_tools.openai_client_text import  chat_completion_with_format
+from openai_tools.openai_client_text import  async_chat_completion_with_format
 from typing import Any, Dict, List, Tuple, Optional
 
 # Schema: classify EACH detected speaker as AGENT or CLIENT
@@ -150,7 +150,7 @@ def _normalize_speaker_id(spk: str) -> str:
 
 
 
-def classify_all_speakers_agent_or_client(
+async def async_classify_all_speakers_agent_or_client(
     diarized: Any,
     max_chars_per_speaker: int = 2400,
 ) -> Dict[str, str]:
@@ -208,7 +208,7 @@ def classify_all_speakers_agent_or_client(
             else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
         )
 
-    resp = chat_completion_with_format(
+    resp = await async_chat_completion_with_format(
         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         format_schema=SCHEMA_MULTI_SPEAKER_ROLES,
         schema_name="multi_speaker_roles",

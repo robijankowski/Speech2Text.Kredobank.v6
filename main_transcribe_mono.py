@@ -18,11 +18,11 @@ from pydub.effects import normalize
 from core.config import settings
 
 from transcribe.utilities.transcribe_stereo_tools import (
-    transcript_audio_file_verbose_o4_single_channel,
-    transcript_audio_file_verbose_o4_stereo,
+    async_transcript_audio_file_verbose_o4_single_channel,
+    async_transcript_audio_file_verbose_o4_stereo,
 )
 from transcribe.utilities.scenario_tools import (
-    split_transcription_into_roles_4o,
+    async_split_transcription_into_roles_4o,
     consolidate_dialogue,
 )
 
@@ -45,12 +45,12 @@ from transcribe.utilities.audio_tools import (
 
 # If you already use these in your pipeline, we reuse them to stay consistent
 from transcribe.utilities.scenario_tools import (
-    detect_speaker_roles,
+    async_detect_speaker_roles,
     add_prefix_to_sentences,
 )
 
 from transcribe.utilities.transcribe_mono_tools import (
-    classify_all_speakers_agent_or_client
+    async_classify_all_speakers_agent_or_client
 )
 
 from core.logger import get_logger, shutdown_logger
@@ -879,7 +879,7 @@ def map_speaker_ids_to_roles(
     t0 = " ".join(s.text for s in by[s0])
     t1 = " ".join(s.text for s in by[s1])
 
-    agent_text, client_text = detect_speaker_roles(t0, t1)
+    agent_text, client_text = async_detect_speaker_roles(t0, t1)
 
     # detect_speaker_roles usually returns one of inputs (or near-identical).
     # We map by best whitespace-normalized containment.
@@ -1034,7 +1034,7 @@ def transcribe_mono_to_scenario(
 
     print("\n\nDiarization result:", diar)
 
-    speaker_map = classify_all_speakers_agent_or_client(diar)
+    speaker_map = async_classify_all_speakers_agent_or_client(diar)
     print("\n\nRole mapping:", speaker_map)
 
     # diar = relabel_diarized_speakers(diar, speaker_map=speaker_map, default_role="Agent")
@@ -1094,27 +1094,27 @@ def transcribe_file_to_scenario(
         # Existing stereo pipeline (same as main_transcribe_openai)
         l_file, r_file, org_file = prepare_audio_for_transcription(source_file, temp_dir)
 
-        o4_left = transcript_audio_file_verbose_o4_single_channel(
+        o4_left = async_transcript_audio_file_verbose_o4_single_channel(
             l_file,
             o4_metadata_text=_to_str_metadata(metadata),
             temperature=temperature,
         )
-        o4_right = transcript_audio_file_verbose_o4_single_channel(
+        o4_right = async_transcript_audio_file_verbose_o4_single_channel(
             r_file,
             o4_metadata_text=_to_str_metadata(metadata),
             temperature=temperature,
         )
-        o4_full = transcript_audio_file_verbose_o4_stereo(
+        o4_full = async_transcript_audio_file_verbose_o4_stereo(
             org_file,
             o4_metadata_text=_to_str_metadata(metadata),
             temperature=temperature,
         )
 
-        agent_text, client_text = detect_speaker_roles(o4_left.text, o4_right.text)
+        agent_text, client_text = async_detect_speaker_roles(o4_left.text, o4_right.text)
         agent_text = add_prefix_to_sentences(agent_text, "AG:")
         client_text = add_prefix_to_sentences(client_text, "CL:")
 
-        scenario_granular = split_transcription_into_roles_4o(
+        scenario_granular = async_split_transcription_into_roles_4o(
             agent_text=agent_text,
             client_text=client_text,
             stereo_text=o4_full.text,
