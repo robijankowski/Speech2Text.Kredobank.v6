@@ -8,8 +8,6 @@ log = get_logger(__name__)
 
 
 from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md, is_configuration_ok
-from transcribe.utilities.call_analysis_engine import async_analyze_transcription_questions
-
 
 
 
@@ -148,17 +146,19 @@ CALL_DATE = date(2026, 1,15)
 SYSTEM_CODE = "kcc"
 
 
-from transcribe.utilities.transcribe_pipeline import (async_transcribe_audio_file_to_scenario_pipeline, 
-                                                      async_generate_scenario_summary_pipeline, 
-                                                      async_evaluate_transcripted_scenario_pipeline,
-                                                      async_run_analysis_of_the_transcription_pipeline
-                                                      )
+from transcribe.utilities.transcribe_pipeline import ( async_transcribe_audio_file_to_scenario_pipeline,
+                                                          async_generate_scenario_summary_pipeline,
+                                                          async_evaluate_transcripted_scenario_pipeline,
+                                                          async_run_analysis_of_the_transcription_pipeline,
+                                                          async_evaluate_conversation_interrupts_pipeline,
+                                                          )
+
 
 async def async_run_transcription(start_index=0, end_index=None):
     try:
         reports = audit_evaluation_configs(settings.TR_EVALUATION_CONFIGS_ROOT)
         print(format_audit_report_md(reports))
-        print(f"Is configuration OK? {is_configuration_ok(reports)} ")
+        log.info(f"Is configuration OK? {is_configuration_ok(reports)} ")
 
         # settings.USE_AZURE_OPENAI = "Y"  # Change to "Y" to use Azure OpenAI for analysis
 
@@ -172,34 +172,38 @@ async def async_run_transcription(start_index=0, end_index=None):
 
 
             
-            log.info("\n\n" + "=" * 60 + f"\nRunning transcription for file number {file_number}, file name: '{audio_file}'\n")
-            scenario = await async_transcribe_audio_file_to_scenario_pipeline( source_file=audio_file,
+            log.info("\n\n" + "=" * 60 + f"\nRunning transcription for file name: '{audio_file}'\n")
+            turns, scenario = await async_transcribe_audio_file_to_scenario_pipeline( source_file=audio_file,
                                                           temp_root_dir=settings.TR_TEMP_ROOT_DIR,
                                                           metadata=metadata_json 
                                                           )
-            log.info(f"Scenario for file number {file_number} :\n{scenario}")
+            log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
 
-
-            log.info("\n\n" + "=" * 60 + f"\nRunning summary for file number {file_number}, file name: '{audio_file}'\n")
+            # return
+            log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
             summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
-            log.info(f"Summary for file number {file_number} :\n{summary}")
+            log.info(f"Summary for file number {audio_file} :\n{summary}")
 
 
-            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation for file number {file_number}, file name: '{audio_file}'\n")
+            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
+            res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, file_name=audio_file) # this is not async - pure calcs.
+            log.info(f"Evaluation interrupts result {audio_file} :\n{res_interrupts}")
+
+            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation for file name: '{audio_file}'\n")
             res, success = await async_evaluate_transcripted_scenario_pipeline( scenario=scenario,
                                                                     metadata=metadata_json,
                                                                     system_code=SYSTEM_CODE,
                                                                     call_date=CALL_DATE,
                                                                     call_info=CALL_INFO,
-                                                                    prev_result=None
+                                                                    prev_result=None,
+                                                                    interrupts_analysis=res_interrupts
                                                                     )
-            log.info(f"Evaluation results {file_number} :\n{success}\nResult: {json.dumps(res, indent=2)}")
+            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, indent=2)}")
 
-            log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for file number {file_number}, file name: '{audio_file}'\n")
+            log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for  file name: '{audio_file}'\n")
             request = json.loads(SAMPLE_REQUEST_JSON) #simluation of phase 2 - analysis on free questions
             request["conversation"] = scenario
-            res, success = await async_run_analysis_of_the_transcription_pipeline(request_json=request, 
-                                                                                        prev_result=None)
+            res, success = await async_run_analysis_of_the_transcription_pipeline(request_json=request, prev_result=None)
             log.info(f"SUCCESS: {success}")
             for a in res["answers"]:
                 log.info(f'{a["questionId"]}: {a["status"]} -> {a.get("answer")}')
@@ -215,4 +219,4 @@ async def async_run_transcription(start_index=0, end_index=None):
 
 # Run the main function
 if __name__ == "__main__":
-    asyncio.run(async_run_transcription(0,0))  # Change indices to process specific files or ranges
+    asyncio.run(async_run_transcription(1,1))  # Change indices to process specific files or ranges

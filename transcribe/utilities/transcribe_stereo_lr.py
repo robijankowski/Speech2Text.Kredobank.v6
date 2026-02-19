@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, BinaryIO, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, BinaryIO, Union, Tuple
 
 import os
 import shutil
@@ -20,44 +20,21 @@ from openai_tools.openai_client_transcribe import (
 )
 
 from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean_lr
-from transcribe.utilities.scenario_tools import async_classify_agent_or_client_prefix, Turn
+from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
+from transcribe.utilities.scenario_tools import (async_classify_agent_or_client_prefix, 
+                                                 Turn, 
+                                                 DiarSeg,
+                                                 render_timestamped_script_from_turns,
+                                                 render_timestamped_script_from_diar_segs,
+                                                 render_turns_tight_vs_ext
+                                                 )
+from transcribe.utilities.audio_tools_lr import split_stereo_to_lr_for_segments_lr
 
 AudioInput = Union[str, Path, BinaryIO]
 
 
 
-# =========================
-# Formatting helpers
-# =========================
 
-def _fmt_ts(sec: float) -> str:
-    """Format seconds as MM:SS.mmm."""
-    ms_total = int(round(sec * 1000))
-    mm, rem = divmod(ms_total, 60_000)
-    ss, ms = divmod(rem, 1000)
-    return f"{mm:02d}:{ss:02d}.{ms:03d}"
-
-
-def format_mmss_ms(sec: float) -> str:
-    """Backwards-compatible alias used by older code."""
-    return _fmt_ts(sec)
-
-
-def render_timestamped_script(turns: Sequence[Turn], timestamp_on: bool = True) -> str:
-    lines: List[str] = []
-    for t in turns:
-        if timestamp_on:
-            lines.append(f"[{_fmt_ts(t.start)}–{_fmt_ts(t.end)}] {t.role}: {t.text}")
-        else:
-            lines.append(f"{t.role}: {t.text}")
-    return "\n".join(lines)
-
-def render_timestamped_script_o4(turns: Sequence[Turn]) -> str:
-    lines: List[str] = []
-    for t in turns:
-        lines.append(f"[{_fmt_ts(t.start)}–{_fmt_ts(t.end)}]: {t.text}")
-        # lines.append(f"{t.role}: {t.text}")
-    return "\n".join(lines)
 
 def merge_adjacent_turns(turns: List[Turn], *, gap_sec: float = 0.8) -> List[Turn]:
     """
@@ -155,50 +132,44 @@ def _extract_segments(obj: Any) -> List[Any]:
 
 
 
-async def async_o4_bounds_from_o4_words(
-    wav_path: str,
+async def async_gen_o4_diar_segments(
+    *,
+    wav_seg_path: str,
     language: str = "uk",
     temperature: float = 0.0,
-    *,
-    # segment cleanup (these are SEGMENTS, not words)
     min_seg_s: float = 0.10,
     max_seg_s: float = 300.0,
-
-    # phrase building / merging
-    join_gap_s: float = 0.65,         # merge if gap <= this
-    hard_break_gap_s: float = 1.10,   # force break if gap >= this
-    break_on_punct: bool = False,     # usually unnecessary for diarized segments
-
-    # phrase constraints
-    min_phrase_s: float = 0.30,
-    max_phrase_s: float = 15.0,
-
-) -> List[Tuple[float, float]]:
+) -> List[DiarSeg]:
     """
-    Build slicing bounds from O4 diarized SEGMENTS (not word timestamps).
-
-    Output bounds are "tight" (no padding). All padding is handled later in slice_wav(... pad_ms=...).
+    Run O4 diarize on wav_seg_path (conditioning-safe audio) to obtain diarized segments.
+    Returns cleaned segments: (start, end, text, speaker), sorted by time.
     """
     res = await async_transcribe_audio_diarized(
-        audio=wav_path,
+        audio=wav_seg_path,
         language=language,
         temperature=temperature,
     )
 
     segs = _extract_segments(res)
 
-    script = render_timestamped_script_o4(segs)
+    script = render_timestamped_script_from_diar_segs(segs)
     log.info(f"\n=== O4 diarized segments ===\n{str(script)}")
 
     def s_get(s: Any, k: str) -> Any:
         return s.get(k) if isinstance(s, dict) else getattr(s, k, None)
 
-    # normalize + clean segments
-    cleaned: List[Tuple[float, float, str]] = []
+    cleaned: List[DiarSeg] = []
     for s in segs:
         st = s_get(s, "start")
         en = s_get(s, "end")
         txt = (s_get(s, "text") or "").strip()
+        spk = (
+            s_get(s, "speaker")
+            or s_get(s, "speaker_id")
+            or s_get(s, "spk")
+            or "S0"
+        )
+        spk = str(spk).strip() if spk is not None else "S0"
 
         if st is None or en is None:
             continue
@@ -213,12 +184,32 @@ async def async_o4_bounds_from_o4_words(
         if not txt:
             continue
 
-        cleaned.append((st_f, en_f, txt))
-
-    if not cleaned:
-        return []
+        cleaned.append((st_f, en_f, txt, spk))
 
     cleaned.sort(key=lambda x: (x[0], x[1]))
+    return cleaned
+
+
+def build_turns_from_diar_segments(
+    cleaned: List[DiarSeg],
+    *,
+    wav_path: str,
+    join_gap_s: float = 0.65,
+    hard_break_gap_s: float = 1.10,
+    break_on_punct: bool = False,
+    min_phrase_s: float = 0.30,
+    max_phrase_s: float = 15.0,
+) -> List[Turn]:
+    """
+    Merge cleaned diarized segments into phrase-level Turns.
+    - Break on speaker change (keeps role meaningful)
+    - Break on hard gaps
+    - Optionally break on strong punctuation
+    - Join close segments
+    - Enforce max_phrase_s without duplicating a segment
+    """
+    if not cleaned:
+        return []
 
     STRONG_PUNCT = {".", "!", "?", "…"}
 
@@ -226,147 +217,271 @@ async def async_o4_bounds_from_o4_words(
         t = (text or "").strip()
         return bool(t) and t[-1] in STRONG_PUNCT
 
-    # merge into phrases (tight unions, no padding)
-    bounds: List[Tuple[float, float]] = []
+    turns: List[Turn] = []
 
-    cur_st, cur_en, cur_txt = cleaned[0]
-    for st, en, txt in cleaned[1:]:
+    cur_st, cur_en, cur_txt, cur_spk = cleaned[0]
+    cur_parts: List[str] = [cur_txt]
+    cur_last_txt: str = cur_txt
+
+    def flush():
+        phrase_text = " ".join(p for p in cur_parts if p).strip()
+        if phrase_text and (cur_en - cur_st) >= min_phrase_s:
+            turns.append(
+                Turn(
+                    role=cur_spk,
+                    start=cur_st,
+                    end=cur_en,
+                    text=phrase_text,         # diar text (cheap transcript)
+                    text_diar=phrase_text,
+                    file=wav_path,
+                )
+            )
+
+    for st, en, txt, spk in cleaned[1:]:
         gap = st - cur_en
 
-        # force break on huge gap
-        if gap >= hard_break_gap_s:
-            bounds.append((cur_st, cur_en))
-            cur_st, cur_en, cur_txt = st, en, txt
+        # speaker change -> flush, start new
+        if spk != cur_spk:
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
             continue
 
-        # optional punctuation break (usually off for diarized segments)
-        if break_on_punct and ends_with_strong_punct(cur_txt):
-            bounds.append((cur_st, cur_en))
-            cur_st, cur_en, cur_txt = st, en, txt
+        # hard break gap
+        if gap >= hard_break_gap_s:
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
+            continue
+
+        # optional punctuation break
+        if break_on_punct and ends_with_strong_punct(cur_last_txt):
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
             continue
 
         # join if close enough
         if gap <= join_gap_s:
-            cur_en = max(cur_en, en)
-            cur_txt = txt
+            prospective_end = max(cur_en, en)
 
-            # cap phrase length
-            if (cur_en - cur_st) >= max_phrase_s:
-                bounds.append((cur_st, cur_en))
-                cur_st, cur_en, cur_txt = st, en, txt
+            # cap BEFORE adding -> avoids duplicating current segment in two phrases
+            if (prospective_end - cur_st) >= max_phrase_s:
+                flush()
+                cur_st, cur_en, cur_spk = st, en, spk
+                cur_parts = [txt]
+                cur_last_txt = txt
+                continue
+
+            cur_en = prospective_end
+            cur_parts.append(txt)
+            cur_last_txt = txt
             continue
 
         # otherwise new phrase
-        bounds.append((cur_st, cur_en))
-        cur_st, cur_en, cur_txt = st, en, txt
+        flush()
+        cur_st, cur_en, cur_spk = st, en, spk
+        cur_parts = [txt]
+        cur_last_txt = txt
 
-    bounds.append((cur_st, cur_en))
+    # final flush
+    flush()
 
-    # filter very short phrases (still tight)
-    out = [(st, en) for st, en in bounds if (en - st) >= min_phrase_s]
-
-    
-    bounds_info = [f"\no4_bounds_from_o4_words: segs={len(segs)} cleaned={len(cleaned)} bounds={len(out)}"]
-    for st, en in out[:20]:
-        bounds_info.append(f"  {st:.2f}–{en:.2f} ({en - st:.2f}s)")
-    log.info("\n".join(bounds_info))        
-
-    
-    return out
+    return turns
 
 
 
 
-def extend_chunk_ends(
-    bounds: List[Tuple[float, float]],
-    *,
+def extend_chunk_ends_turns(
+    turns: List[Turn],
     extend_s: float = 4.0,
     pad_s: float = 0.25,      # same pad you use in slice_wav (converted from ms)
     safety_s: float = 0.5,    # your "-0.5 sec"
     max_total_s: Optional[float] = None,  # e.g., wav duration, if available
-) -> List[Tuple[float, float]]:
+) -> List[Turn]:
     """
-    Extend each chunk end by extend_s, but never beyond (next_start - pad_s - safety_s).
-    Keeps starts unchanged. Guaranteed non-overlap with next chunk's padded region.
-    """
-    out: List[Tuple[float, float]] = []
-    n = len(bounds)
+    Populate start_ext/end_ext for each Turn:
+      - start_ext = start (unchanged)
+      - end_ext   = min(end + extend_s, next_start - pad_s - safety_s, max_total_s)
 
-    for i, (st, en) in enumerate(bounds):
+    Tight timestamps remain in start/end. Extended timestamps are for slicing only.
+    Guaranteed non-overlap with next chunk's padded region.
+    """
+    if not turns:
+        return []
+
+    turns_sorted = sorted(turns, key=lambda t: (t.start, t.end))
+
+    out: List[Turn] = []
+    n = len(turns_sorted)
+
+    for i, t in enumerate(turns_sorted):
+        st = t.start
+        en = t.end
+
         # Default: extend by extend_s
-        target_end = en + extend_s
+        target_end_ext = en + extend_s
 
         # Cap by next chunk start (if exists)
         if i + 1 < n:
-            next_start = bounds[i + 1][0]
+            next_start = turns_sorted[i + 1].start
             cap = next_start - pad_s - safety_s
             if cap > en:
-                target_end = min(target_end, cap)
+                target_end_ext = min(target_end_ext, cap)
             else:
-                target_end = en  # cannot extend safely
+                target_end_ext = en  # cannot extend safely
 
         # Optional cap by total duration
         if max_total_s is not None:
-            target_end = min(target_end, max_total_s)
+            target_end_ext = min(target_end_ext, max_total_s)
 
-        out.append((st, target_end))
+        # start_ext stays tight start (this function extends only end)
+        start_ext = st
+        end_ext = target_end_ext
+
+        out.append(
+            Turn(
+                role=t.role,
+                start=st,
+                end=en,
+                text=t.text,
+                text_diar=t.text_diar,
+                file=t.file,
+                start_ext=start_ext,
+                end_ext=end_ext,
+            )
+        )
 
     return out
 
 
-async def async_transcribe_channel_by_bounds(
-    channel_wav: str,
-    role: str,
+
+
+async def async_transcribe_channel_by_turns(
+    turns: List[Turn],          # Turns with tight start/end, and populated start_ext/end_ext for slicing
     language: str = "uk",
     chunk_pad_ms: int = 250,
     min_seg_s: float = 0.25,
-    metadata: Any = None
+    metadata: Any = None,
 ) -> List[Turn]:
-
-    # Tight bounds (these are the timestamps you want in the final output)
-    bounds = await async_o4_bounds_from_o4_words(channel_wav)
-
-    # Extended bounds only for slicing audio (extra context to avoid cut sentences)
-    pad_s = chunk_pad_ms / 1000.0
-    bounds_ext = extend_chunk_ends(bounds, extend_s=3.0, pad_s=pad_s, safety_s=1)
-
-    # Log first N for sanity
-    bounds_info = ["bounds (orig -> ext)"]
-    for (st, en), (st2, en2) in list(zip(bounds, bounds_ext))[:20]:
-        bounds_info.append(
-            f"  {st:.2f}–{en:.2f} ({en-st:.2f}s)  ->  {st2:.2f}–{en2:.2f} ({en2-st2:.2f}s)"
-        )
-    log.info("\n".join(bounds_info))
-
+    """
+    IMPORTANT:
+    - output timestamps come from Turn.start/Turn.end (tight)
+    - slicing uses Turn.start_ext/Turn.end_ext (extended)
+    - wav filename is taken from Turn.file
+    - preserves your prompt/context/metadata logic
+    """
     out: List[Turn] = []
     prev_context = ""
-    base = os.path.splitext(channel_wav)[0]
 
-    # IMPORTANT: output timestamps come from `bounds`, slicing comes from `bounds_ext`
-    for i, ((st, en), (st_ext, en_ext)) in enumerate(zip(bounds, bounds_ext)):
+    if not turns:
+        return []
+
+    # deterministic order
+    turns_sorted = sorted(turns, key=lambda t: (t.start, t.end))
+
+    day_dir = Path(settings.TR_TEMP_ROOT_DIR) / datetime.now().strftime("%Y-%m-%d")
+    day_dir.mkdir(parents=True, exist_ok=True)
+    
+    meta = metadata if isinstance(metadata, str) else (json.dumps(metadata, ensure_ascii=False) if metadata else "")
+
+    for i, t in enumerate(turns_sorted):
+        st, en = t.start, t.end
+        st_ext, en_ext = t.start_ext, t.end_ext
+
         if (en - st) < min_seg_s:
             continue
 
-        day_dir = Path(settings.TR_TEMP_ROOT_DIR) / datetime.now().strftime("%Y-%m-%d")
-        day_dir.mkdir(parents=True, exist_ok=True)
-        base_name = Path(base).stem
+        channel_wav = t.file.strip()
+        if not channel_wav:
+            raise ValueError("Turn.file is empty; cannot slice audio.")
+        base_name = Path(channel_wav).stem
         chunk_path = str(day_dir / f"{base_name}_seg_{i:04d}.wav")
 
         # Slice with extended bounds (extra context)
         slice_wav(channel_wav, chunk_path, st_ext, en_ext, pad_ms=chunk_pad_ms)
-        meta = metadata if isinstance(metadata, str) else (json.dumps(metadata, ensure_ascii=False) if metadata else "")
-        ctx = prev_context[-150:]  # small window, not 1500 chars
+
+        ctx = (prev_context or "")[-250:].strip()
+
+        # prompt = (
+        #     f"This is part of conversation between Bank AGENT and Bank CLIENT."
+        #     "Transcribe verbatim. Keep original spoken language (UA/RU mixed).\n"
+        #     "Do not paraphrase. Keep names, amounts, dates exactly. Output only transcript text.\n"
+        #     "If word is unclear make a guess and new one with similiar sound/tone\n"
+        #     f"Known entities canonical names: {meta}\n"
+        # )
+        # if prev_context:
+        #     prompt += f"Previous context (do not repeat): {ctx}\n"
+        # prompt += "Recognize what {t.role} says."
+
+        # prompt = (
+        #     f"This is part of conversation between Bank AGENT and Bank CLIENT."
+        #     "Transcribe verbatim. Keep original spoken language (UA/RU mixed).\n"
+        #     "Do not paraphrase. Keep names, amounts, dates exactly. Output only transcript text.\n"
+        #     f"Known entities canonical names: {meta}\n"
+        # )
+        # if ctx:
+        #     prompt += f"Previous context (do not repeat): {ctx}\n"
+        # prompt += f"Recognize what {t.role} says."
+
+        # prompt = (
+        #     f"This is part of conversation between Bank AGENT and Bank CLIENT."
+        #     "Transcribe verbatim. Keep original spoken language (UA/RU mixed).\n"
+        #     "Do not paraphrase. Keep names, amounts, dates exactly. Output only transcript text.\n"
+        #     f"Known entities canonical names: {meta}\n"
+        # )
+        # if ctx:
+        #     prompt += f"Previous context (do not repeat): {ctx}\n"
+        # if t.text_diar:
+        #     prompt += f"You can use this text as clue when transcribing: '{t.text_diar}'\n"
+        # prompt += f"Recognize very carefullu what {t.role} says."
+
+
+        # prompt = (
+        #     "Transcribe THIS audio slice only. Output ONLY transcript text.\n"
+        #     "Keep UA/RU as spoken. Verbatim (repeats/fillers/stutters). No paraphrase/translation.\n"
+        #     "Keep names/amounts/dates exactly. If NO speech (noise/silence) -> output EMPTY.\n"
+        #     "Never copy from context/draft unless heard in audio.\n"
+        #     "If there is no speach or you can not recognize any word then return empty string"
+        #     f"Known entities canonical names: <META>{meta}</META>\n"
+        # )
+
+        # if ctx:
+        #     prompt += f"Context (continuity only, don't repeat): <CONTEXT>{ctx}</CONTEXT>\n"
+
+        # if t.text_diar:
+        #     prompt += (
+        #         "Use your transcription and DRAFT. Select better in context. "
+        #         f"<DRAFT>{t.text_diar}</DRAFT>\n"
+        #     )
+
+        # prompt += f"Speaker: {t.role}\n"
+
 
         prompt = (
-            "Transcribe this call slice verbatim in the original language.\n"
-            "Include EVERY spoken word (even repeats, fillers, stutters, corrections, partial words).\n"
-            "Do NOT paraphrase or summarize. Preserve numbers, names, banking terms.\n"
-            "Output ONLY the transcript text (no tags, no punctuation rules beyond what you hear).\n"
-            "If no voice is present, output an empty string.\n"
-            f"Known entities canonical names: {meta}"
+            "Transcribe THIS audio slice only. Output ONLY transcript text.\n"
+            "First decide: is there CLEAR speech? If not (noise/silence/too unclear) output EMPTY string.\n"
+            "Keep UA/RU as spoken. Verbatim (repeats/fillers/stutters). No paraphrase/translation.\n"
+            "Keep names/amounts/dates exactly.\n"
+            "Never invent. Never copy from context/draft unless you clearly hear it in the audio.\n"
+            f"Known entities: <META>{meta}</META>\n"
         )
-        # if prev_context:
-        #     prompt += f"Previous context (for continuity; it may repeat naturally): {prev_context}\n"
+
+        if ctx:
+            prompt += f"Context (continuity only; do NOT repeat/copy): <CONTEXT>{ctx}</CONTEXT>\n"
+
+        if t.text_diar:
+            prompt += (
+                "Draft for this slice: use ONLY if audio clearly matches; otherwise ignore.\n"
+                f"<DRAFT>{t.text_diar}</DRAFT>\n"
+            )
+
+        prompt += f"Speaker: {t.role}\n"
+
+
 
         tr = await async_transcribe_audio(
             audio=chunk_path,
@@ -376,83 +491,46 @@ async def async_transcribe_channel_by_bounds(
             response_format="json",
             prompt=prompt,
         )
-        log.info(tr.text)
+
+
         text = (getattr(tr, "text", None) or (tr.get("text") if isinstance(tr, dict) else "") or "").strip()
+        log.info(
+            f"\n\n{chunk_path}"
+            f"\n\nCONTEXT ---> {ctx}"
+            f"\n\n   ROLE ---> {t.role}" 
+            f"\n  MODEL ---> {text}" 
+            f"\n   DIAR ---> {t.text_diar}\n"
+            )
+        
         if text:
-            # Return ORIGINAL timestamps (tight)
-            out.append(Turn(role=role, start=st, end=en, text=text))
-            prev_context = (prev_context + " " + text).strip()
+            # Return tight timestamps + keep ext fields (useful for debugging / later stages)
+            out.append(
+                Turn(
+                    role=t.role,
+                    start=st,
+                    end=en,
+                    text=text,
+                    file=channel_wav,
+                    start_ext=st_ext,
+                    end_ext=en_ext,
+                    text_diar=t.text_diar
+                )
+            )
+            prev_context = (prev_context + f" {t.role}: {text}").strip()
 
     return out
 
 
-async def async_transcribe_stereo_high_accuracy_with_timestamps(
-    left_wav: str,
-    right_wav: str,
-    language: str = "uk",
-    chunk_pad_ms: int = 250,
-    min_seg_s: float = 0.25,
-    merge_same_role_gap_s: float = 0.8,
-    metadata: Any = None
-) -> Tuple[List[Turn], str]:
-    """
-    Transcribe two mono channels (L=AG, R=CL), return (turns, script).
-    bounds_method controls how speech segments are detected (diarize/VAD/whisper-segments).
-    """
-
-    a_turns = await async_transcribe_channel_by_bounds(
-        channel_wav=left_wav,
-        role="A",
-        language=language,
-        chunk_pad_ms=chunk_pad_ms,
-        min_seg_s=min_seg_s,
-        metadata=metadata
-    )
-
-    b_turns = await async_transcribe_channel_by_bounds(
-        right_wav,
-        role="B",
-        language=language,
-        chunk_pad_ms=chunk_pad_ms,
-        min_seg_s=min_seg_s,
-        metadata=metadata
-    )
-    
-    a_text = render_timestamped_script(a_turns, timestamp_on=False)
-    a_role_res = await async_classify_agent_or_client_prefix(a_text)
-    log.info(f"\n=== Detected roles ===\n{a_role_res}") 
-    if a_role_res == "AGENT":
-        a_role, b_role = "AG", "CL"
-    elif a_role_res:
-        a_role, b_role = "CL", "AG"
-
-    a_turns = [Turn(role=a_role, start=t.start, end=t.end, text=t.text) for t in a_turns]
-    b_turns = [Turn(role=b_role, start=t.start, end=t.end, text=t.text) for t in b_turns]
-    a_text = render_timestamped_script(a_turns)
-    b_text = render_timestamped_script(b_turns)
-    log.info(f"\n=== AG script ===\n{a_text}")
-    log.info(f"\n=== CL script ===\n{b_text}")   
-
-    turns = sorted(a_turns + b_turns, key=lambda x: (x.start, x.end))
-    turns = merge_adjacent_turns(turns, gap_sec=merge_same_role_gap_s)
-    script = render_timestamped_script(turns)
-
-    log.info(f"\n=== Final script ===\n{script}")
-
-    return turns, script
 
 
-async def async_transcribe_stereo_lr_timestamped(
-    *,
+async def async_transcribe_stereo_timestamped_lr(
     source_file: str,
     temp_root_dir: Optional[str] = None,
     language: str = "uk",
-    metadata: Any = None
+    metadata: Any = None,
+    chunk_pad_ms: int = 200,
+    min_seg_s: float = 0.25,
 ) -> Tuple[List[Turn], str]:
-    """
-    Stereo -> (turns, script) with timestamps.
-    AG = left channel, CL = right channel.
-    """
     if not temp_root_dir:
         temp_root_dir = settings.TR_TEMP_ROOT_DIR
 
@@ -466,14 +544,72 @@ async def async_transcribe_stereo_lr_timestamped(
 
     # 2) split + clean (normalize + 16k + NR) WITHOUT cutting silences
     left_wav, right_wav = split_stereo_to_lr_and_clean_lr(str(dst))
-    # left_wav, right_wav = process_stereo_recording2(str(dst))
+    l_seg_wav, r_seg_wav = split_stereo_to_lr_for_segments_lr(str(dst), max_gain_db=4.0, target_peak_dbfs=-3.0)
 
-    turns, script = await async_transcribe_stereo_high_accuracy_with_timestamps(
-        left_wav,
-        right_wav,
+    cleaned_a = await async_gen_o4_diar_segments(
+        wav_seg_path=l_seg_wav,
         language=language,
-        chunk_pad_ms=200,   
-        metadata=metadata,
-        )
+        temperature=0.0,
+        min_seg_s=min_seg_s,
+    )
 
-    return turns, script
+    cleaned_b = await async_gen_o4_diar_segments(
+        wav_seg_path=r_seg_wav,
+        language=language,
+        temperature=0.0,
+        min_seg_s=min_seg_s,
+    )
+
+    a_turns = build_turns_from_diar_segments(
+        cleaned_a,
+        wav_path=left_wav,          # IMPORTANT: original file for slicing later
+        join_gap_s=0.65,
+        hard_break_gap_s=1.10,
+        break_on_punct=False,
+        min_phrase_s=0.30,
+        max_phrase_s=15.0,
+    )
+
+    b_turns = build_turns_from_diar_segments(
+        cleaned_b,
+        wav_path=right_wav,          # IMPORTANT: original file for slicing later
+        join_gap_s=0.65,
+        hard_break_gap_s=1.10,
+        break_on_punct=False,
+        min_phrase_s=0.30,
+        max_phrase_s=15.0,
+    )
+
+    a_scenario_text = render_timestamped_script_from_turns(a_turns, timestamp_on=False)
+    a_role_res = await async_classify_agent_or_client_prefix(a_scenario_text)
+    log.info(f"\n=== Detected role for left channel: {a_role_res} ===") 
+    if a_role_res == "AGENT":
+        a_role, b_role = "AGENT", "CLIENT"
+    elif a_role_res:
+        a_role, b_role = "CLIENT", "AGENT"
+    a_turns = [Turn(role=a_role, start=t.start, end=t.end, text=t.text, text_diar=t.text_diar, file=t.file) for t in a_turns]
+    b_turns = [Turn(role=b_role, start=t.start, end=t.end, text=t.text, text_diar=t.text_diar, file=t.file) for t in b_turns]
+
+    pad_s = chunk_pad_ms / 1000.0
+    a_turns_ext = extend_chunk_ends_turns(a_turns, extend_s=3.0, pad_s=pad_s, safety_s=1)
+    b_turns_ext = extend_chunk_ends_turns(b_turns, extend_s=3.0, pad_s=pad_s, safety_s=1)
+
+    turns = sorted(a_turns_ext + b_turns_ext, key=lambda x: (x.start, x.end))
+
+    turns_info = render_turns_tight_vs_ext(turns=turns)
+    log.info(turns_info)
+
+
+    res_turns = await async_transcribe_channel_by_turns(turns = turns, 
+                                                        language = language,
+                                                        chunk_pad_ms = chunk_pad_ms,
+                                                        min_seg_s = min_seg_s,
+                                                        metadata = metadata,
+                                                        )
+
+    script = render_timestamped_script_from_turns(res_turns)
+    log.info(f"\n=== Final script ===\n{script}")
+
+    return res_turns, script
+
+

@@ -154,21 +154,21 @@ test_turns2 = [Turn(role='CL', start=1.78, end=2.38, text='Доброго дня
 test_turns3 = [Turn(role='AG', start=3.284, end=10.783999999999999, text='Доброго дня, ви зателефонували до Ощадбанку, звати мене Святослав, мій порядковий номер 1087. Слухаю, що я можу вам підказати?'), Turn(role='CL', start=4.436, end=5.186, text='Добрий.'), Turn(role='CL', start=6.635999999999999, end=6.985999999999999, text='Добрий.'), Turn(role='CL', start=11.236, end=14.436, text='Чи ви другий день дзвоните, чи трубку скидаєте, чи що?'), Turn(role='AG', start=15.733999999999998, end=18.183999999999997, text='Дивіться, Таранко Світлану Олексіївну'), Turn(role='CL', start=17.836, end=19.386, text='Так, так, так.'), Turn(role='AG', start=20.833999999999996, end=24.233999999999995, text='Ну так, пані Світлано, у вас є вже вирішене питання в кредитбанку?'), Turn(role='CL', start=24.468, end=31.818, text='Так, я знаю. Давайте, щоб я зараз не тратила ваш час, до кінця місяця я положу тобі 4 тисячі.'), Turn(role='AG', start=34.996, end=49.146, text='Пані Світлано, дивіться, у вас по кредитному договору номер ЦЛ338390 з 21 року, з 20 десятого, у вас там по термінування 166 891 гривня та 79 копійок. Це станом на 16.'), Turn(role='CL', start=43.068, end=48.768, text='Я знаю, знаю.'), Turn(role='AG', start=49.896, end=61.79600000000001, text='Вже бачу так більше року, навіть майже два роки фактично, навіть трошки більше двох років у вас протермінування. Як так трапилось, відкажіть, будь ласка? Я щось не бачу.'), Turn(role='CL', start=51.218, end=51.86800000000001, text='чи трубку скидаєте, чи що? Так, так, так. Так, я знаю. Давайте, щоб я зараз не тратила ваш час, до кінця місяця я положу тобі 4 тисячі. Я знаю, знаю.'), Turn(role='CL', start=54.388, end=54.838, text='Угу.'), Turn(role='CL', start=60.588, end=62.988, text='І як трапилось, так і трапилось, життя таке.'), Turn(role='AG', start=64.02, end=67.42, text='Зрозуміло. Але за два роки чому ви не вирішили питання з простроченням?'), Turn(role='CL', start=66.938, end=72.588, text='Ви чуєте мене? Ще раз, будь ласка, зафіксуйте, що я до кінця місяця положу 3 тисячі.'), Turn(role='AG', start=74.72, end=77.67, text='Пані Світлано, ви мене чуєте? Яке у вас протермінування?'), Turn(role='CL', start=76.788, end=82.738, text='Я вас добре чую. Так, все, до побачення, вдалого вам дня.'), Turn(role='AG', start=78.82, end=81.47, text='Ви розумієте, що це несуттєва сума для'), Turn(role='AG', start=83.91999999999999, end=88.82, text="Як ви плануєте вирішувати в подальшому? У вас місячний платіж дев'ять тисяч двісті"), Turn(role='CL', start=87.38, end=98.63, text='Поки ніяк не планую. Ви взагалі людина, ви розумієте, про що я зараз з вами балакаю?'), Turn(role='AG', start=90.356, end=92.65599999999999, text='Ви ніяк не плануєте вирішувати протермінування?'), Turn(role='AG', start=100.20599999999999, end=105.006, text='Ну звісно, щодо кредитного договору, пані Світлано.'), Turn(role='CL', start=101.17999999999999, end=106.58, text='Ну, я розумію, зафіксуйте, що я проплачу.'), Turn(role='AG', start=107.856, end=112.606, text='Ви розумієте, який обсяг вашого протермінування та те, що ви вносите?'), Turn(role='CL', start=108.83, end=110.28, text='Я розумію.'), Turn(role='CL', start=112.53, end=117.298, text='Ну так а де мені їх взяти? Я плачу зараз по можливості, скільки я можу.'), Turn(role='AG', start=117.748, end=121.848, text='А як так трапилось, що близько двох років ви не вирішили питання просрочення?'), Turn(role='CL', start=119.248, end=126.648, text='Та того, що я без роботи. А нічого, що я брала його в мирний час, а зараз війна?'), Turn(role='AG', start=126.498, end=129.398, text='Виставили на біржу працевлаштування, понесуть вам?'), Turn(role='CL', start=127.548, end=128.498, text='Так, давайте.'), Turn(role='CL', start=129.898, end=131.098, text='Так, до побачення.')]
 
 
-from transcribe.utilities.transcribe_pipeline_lr import evaluate_conversation_interrupts_pipeline_lr
-from transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_lr_timestamped
+from transcribe.utilities.transcribe_pipeline_lr import evaluate_conversation_interrupts_pipeline
+from transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_timestamped_lr
 
 if __name__ == "__main__":
     audio_file = "./test/test_call.wav"
     # audio_file = "./test/Одночасна розмова фахівця і клієнта.wav"
     # audio_file = "./test/Святослав одночасна розмова з клієнтом , деколи перебиває.wav"
-    turns, script = asyncio.run(async_transcribe_stereo_lr_timestamped(
+    turns, script = asyncio.run(async_transcribe_stereo_timestamped_lr(
         source_file=audio_file,
     ))
 
     print(f"\n\n\n=== O4: turns ===\n{turns}")
     print(f"\n\n\n=== O4: script ===\n[{script}]")
     
-    res = evaluate_conversation_interrupts_pipeline_lr(
+    res = evaluate_conversation_interrupts_pipeline(
         test_turns1,
     )
     print(json.dumps(res, indent=2, ensure_ascii=False))

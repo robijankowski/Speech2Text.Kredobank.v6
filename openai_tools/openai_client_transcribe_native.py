@@ -96,7 +96,7 @@ def transcribe_audio_native(
     # if ts:
     #     response_format = "verbose_json"
 
-    log.info(f"Started transcribing '{str(audio)}' using native model: {model}")
+    log.info(f"Sync for: '{str(audio)}' using: {model}")
     with _open_audio(audio) as audio_file:
         return _openai_transcribe_client.audio.transcriptions.create(
             file=audio_file,
@@ -138,7 +138,7 @@ async def async_transcribe_audio_native(
     # # If timestamps are requested, OpenAI requires verbose_json
     # if ts:
     #     response_format = "verbose_json"
-    log.info(f"Started async transcribing '{str(audio)}' using native model: {model}")
+    log.info(f"Async for: '{str(audio)}' using: {model}")
 
     with _open_audio(audio) as audio_file:
         return await _async_openai_transcribe_client.audio.transcriptions.create(
@@ -176,7 +176,7 @@ def transcribe_audio_native_diarized(
     """
     model = model or _default_transcribe_diarize_model()
 
-    log.info(f"Started transcribing '{str(audio)}' using native model: {model}")
+    log.info(f"Sync for: '{str(audio)}' using: {model}")
 
     with _open_audio(audio) as audio_file:
         return _openai_transcribe_client.audio.transcriptions.create(
@@ -215,7 +215,7 @@ async def async_transcribe_audio_native_diarized(
     """
     model = model or _default_transcribe_diarize_model()
 
-    log.info(f"Started async transcribing  '{str(audio)}' using native model: {model}")
+    log.info(f"Async for: '{str(audio)}' using: {model}")
 
     with _open_audio(audio) as audio_file:
         return await _async_openai_transcribe_client.audio.transcriptions.create(

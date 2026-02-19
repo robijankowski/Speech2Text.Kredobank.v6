@@ -19,18 +19,18 @@ OPENAI_MODEL_CHAT_SCORE="gpt-5-mini"
 OPENAI_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini"
 
 # THIS is local model configuration (PS)
-AZURE_OPENAI_ENDPOINT="https://testkbazure.cognitiveservices.azure.com/"
+AZURE_OPENAI_ENDPOINT="https://testaianalyzerresname.cognitiveservices.azure.com/"
 AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 
-AZURE_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe-azure-test"
-AZURE_MODEL_TRANSCRIBE_DIARIZE="gpt-4o-transcribe-diarize-azure-test"
+AZURE_MODEL_TRANSCRIBE_STEREO="gpt-4o-transcribe-aianalyzer"
+AZURE_MODEL_TRANSCRIBE_DIARIZE="gpt-4o-transcribe-diarize-aianalyzer"
 
-AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-5.2-chat-azure-test"
-AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2-chat-azure-test"
+AZURE_MODEL_CHAT_TRS_DETECT_PLAYER="gpt-5.2-chat-aianalyzer"
+AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES="gpt-5.2-chat-aianalyzer"
 
-AZURE_MODEL_CHAT_SUMMARY="gpt-5-mini-azure-test"
-AZURE_MODEL_CHAT_SCORE="gpt-5-mini-azure-test"
-AZURE_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini-azure-test"
+AZURE_MODEL_CHAT_SUMMARY="gpt-5-mini-aianalyzer"
+AZURE_MODEL_CHAT_SCORE="gpt-5-mini-aianalyzer"
+AZURE_MODEL_CHAT_ANALYSIS_ENGINE="gpt-5-mini-aianalyzer"
 
 
 

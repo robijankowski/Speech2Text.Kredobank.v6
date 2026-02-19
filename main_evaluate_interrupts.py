@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.config import settings
-from transcribe.utilities.evaluation_interrupts import detect_agent_interruptions
+from transcribe.utilities.evaluation_interrupts import async_detect_agent_interruptions
 
 from core.logger import get_logger, shutdown_logger
 log = get_logger(__name__)
@@ -21,6 +21,6 @@ if __name__ == "__main__":
     for f in files:
         settings.USE_AZURE_OPENAI = "Y"  # force Azure for testing
         print(f"\n\n\n#########################\nFILE: '{f}'\n#########################")
-        res = detect_agent_interruptions( f )
+        res = async_detect_agent_interruptions( f )
         print("\nResult:", res)
     shutdown_logger()  # ensure all logs flushed and file handlers closed

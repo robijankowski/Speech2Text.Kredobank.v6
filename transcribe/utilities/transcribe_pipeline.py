@@ -5,6 +5,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from datetime import date
 import json
+import asyncio
 
 from pydub import AudioSegment
 
@@ -12,12 +13,14 @@ from core.config import settings
 from core.logger import log
 
 from transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario
-from transcribe.utilities.transcribe_mono import async_transcribe_mono_audio_file_to_scenario
+# from transcribe.utilities.transcribe_mono import async_transcribe_mono_audio_file_to_scenario
+from transcribe.utilities.transcribe_mono_lr import async_transcribe_mono_timestamped_lr
 from transcribe.utilities.transcribe_stereo import async_transcribe_stereo_audio_file_to_scenario
 from transcribe.utilities.evaluation_engine import async_run_scheme
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme
+from transcribe.utilities.evaluation_interrupts import async_detect_agent_interruptions
 from transcribe.utilities.call_analysis_engine import async_analyze_transcription_questions
-
+from transcribe.utilities.scenario_tools import Turn, remap_turn_roles, render_timestamped_script_from_turns
 
 
 # -----------------------------
@@ -43,26 +46,28 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
     if not temp_root_dir:
         temp_root_dir = settings.TR_TEMP_ROOT_DIR
 
+    turns = None
+    scenario = ""
     if is_stereo and not force_mono:
-        return await async_transcribe_stereo_audio_file_to_scenario(source_file=source_file,
+        scenario = await async_transcribe_stereo_audio_file_to_scenario(source_file=source_file,
                                                         temp_root_dir=temp_root_dir,
                                                         metadata=metadata 
                                                         )
+    else:
+        turns, scenario = await async_transcribe_mono_timestamped_lr(  source_file=source_file,
+                                                        temp_root_dir=temp_root_dir,
+                                                        metadata=metadata 
+                                                        )
+    if turns:
+        turns = remap_turn_roles(turns)
+        scenario = render_timestamped_script_from_turns(turns, timestamp_on=False, role_on=True)
 
-
-
-    return await async_transcribe_mono_audio_file_to_scenario(  source_file=source_file,
-                                                    temp_root_dir=temp_root_dir,
-                                                    metadata=metadata,
-                                                    temperature=temperature,
-                                                    timeout=timeout
-                                                    )
-
+    return turns, scenario 
+    
 
 
 
 async def async_generate_scenario_summary_pipeline(
-    *,
     scenario: str, 
     model_override: str = None) -> str:
       
@@ -73,15 +78,63 @@ async def async_generate_scenario_summary_pipeline(
 
 
 
+async def async_evaluate_conversation_interrupts_pipeline(
+    turns: List[Turn] = None,
+    file_name: str = "",
+    model_override: str = ""
+) -> Dict[str, Any]:
+    """Rule-based interruption/overlap evaluation for LR timestamped turns.
+
+    Returns a dict with the SAME SHAPE as `evaluation_engine.run_check(...)`.
+    This is intentionally model-free (deterministic), but keeps the `model` field
+    for downstream compatibility.
+    """
+    if not settings.TR_EVALUATE_INTERRUPTS == "Y":
+        return None
+    
+    overlaps_res = await async_detect_agent_interruptions(file_name)
+
+    stats = (overlaps_res or {}).get("stats") or {}
+    any_overlaps = int(stats.get("any_overlaps") or 0)
+    agent_interrupts = int(stats.get("agent_interrupts") or 0)
+    client_interrupts = int(stats.get("client_interrupts") or 0)
+    total_interrupts = agent_interrupts + client_interrupts
+
+    # --- scoring (simple + stable) ---
+    max_points = 1
+    weight = 1.0
+    score = 1
+    if any_overlaps>1:
+        score = 0
+
+    model_label = model_override or "rules"
+
+    return {
+        "id": "conversation_interrupts_lr",
+        "desc": "Conversation overlaps / interruptions (LR timestamped, rule-based)",
+        "score": int(score),
+        "max_points": int(max_points),
+        "weight": float(weight),
+        "weighted_score": float(score) * float(weight),
+        "weighted_max": float(max_points) * float(weight),
+        "model": model_label,
+        "raw": {
+            "overlaps": overlaps_res["overlaps"],
+            "events": overlaps_res["events"],
+            "stats": overlaps_res["stats"],
+        } 
+    }
+
+
 async def async_evaluate_transcripted_scenario_pipeline(
-    *,
     scenario: str,
-    metadata: Any = None,
     system_code: str,
     call_date: date,
+    metadata: Any = None,
     call_info: Optional[Dict[str, Any]] = None,
     prev_result: Optional[Dict[str, Any]] = None,
     model_override: Optional[str] = None,
+    interrupts_analysis: Optional[Dict[str, Any]] = None,
 ):      
     # run_scheme expects metadata to be a string (it calls `.strip()` in prompts)
     if metadata is None:
@@ -118,6 +171,7 @@ async def async_evaluate_transcripted_scenario_pipeline(
         scheme=scheme,
         model_override=model_override,
         prev_result=prev_result,
+        interrupts_analysis=interrupts_analysis
     )
 
     return result, success

@@ -6,11 +6,10 @@ from typing import Any, Dict, List, Optional
 
 
 from core.config import settings
-from openai_tools.openai_client_transcribe_native import transcribe_audio_native_diarized
-from openai_tools.openai_client_transcribe import transcribe_audio_diarized
+from openai_tools.openai_client_transcribe import async_transcribe_audio_diarized
 
 from transcribe.utilities.audio_tools import clean_audio_file
-from transcribe.utilities.scenario_tools import classify_agent_or_client_prefix
+from transcribe.utilities.scenario_tools import async_classify_agent_or_client_prefix
 
 
 # ----------------------------
@@ -137,7 +136,7 @@ def merged_dialogue_text(
 # ----------------------------
 # diarized transcription
 # ----------------------------
-def transcript_audio_file_verbose_o4_diarize(
+async def async_transcript_audio_file_verbose_o4_diarize(
     file_name: str,
     temperature: float = 0.0,
     chunking_strategy: str = "auto",
@@ -161,7 +160,7 @@ def transcript_audio_file_verbose_o4_diarize(
     #         chunking_strategy=chunking_strategy,
     #     )
 
-    transcript = transcribe_audio_diarized(
+    transcript = await async_transcribe_audio_diarized(
         audio=file_name,
         temperature=temperature,
         chunking_strategy=chunking_strategy
@@ -348,7 +347,7 @@ def detect_starts_while_other_speaks(
 # ----------------------------
 # main analysis (NO split L/R)
 # ----------------------------
-def analyze_diarized_groups(
+async def async_analyze_diarized_groups(
     audio_file: str,
     *,
     a_speaker: str = "A",
@@ -371,7 +370,7 @@ def analyze_diarized_groups(
     
     # 1) diarize original file
     clean_audio_file_path = clean_audio_file(str(audio_file))
-    diarized = transcript_audio_file_verbose_o4_diarize(file_name=clean_audio_file_path)
+    diarized = await async_transcript_audio_file_verbose_o4_diarize(file_name=clean_audio_file_path)
 
     # 2) create two lists: A and (B + all rest)
     agent_segs, client_segs = split_by_speaker(diarized, a_speaker=a_speaker)
@@ -380,7 +379,7 @@ def analyze_diarized_groups(
     client_segs = merge_close_segments(client_segs, gap_ms=350)
 
     # print(f"\nagents segs\n{agent_segs}")
-    a_segs_role = classify_agent_or_client_prefix(format_segments(agent_segs))
+    a_segs_role = await async_classify_agent_or_client_prefix(format_segments(agent_segs))
     print(f"\n'A' speaker segment role: {a_segs_role}")
     if not a_segs_role == "AG":
         agent_segs, client_segs = client_segs, agent_segs  # swap
@@ -469,7 +468,7 @@ def analyze_diarized_groups(
         },
     }
 
-def detect_agent_interruptions(file_name: str) -> Optional[str]:
+async def async_detect_agent_interruptions(file_name: str) -> Dict[str, Any]:
     """
     Detect whether a call recording contains meaningful overlapping speech / interruptions.
 
@@ -526,7 +525,7 @@ def detect_agent_interruptions(file_name: str) -> Optional[str]:
     ...     print("Analysis failed")
     """
     try:
-        res = analyze_diarized_groups(
+        res = await async_analyze_diarized_groups(
             file_name,
             a_speaker="A",          # group A vs (B+rest)
             min_overlap_ms=450,
@@ -541,10 +540,9 @@ def detect_agent_interruptions(file_name: str) -> Optional[str]:
             min_words_agent=1,
             min_words_client=1,
         )
-        print("\n\n\nSTATS:", res["stats"])
-        if res["stats"]["any_overlaps"] > 1:
-            return "YES"
-        return "NO"
+    
+        return res
+    
     except Exception as e:
         print(f"Error processing file '{file_name}': {e}")
         return None
