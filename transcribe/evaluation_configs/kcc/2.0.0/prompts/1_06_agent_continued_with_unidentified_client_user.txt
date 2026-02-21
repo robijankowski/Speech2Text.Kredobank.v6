@@ -1,0 +1,11 @@
+Evaluate whether the AGENT continued the conversation after it was clear that the CLIENT was not identified.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

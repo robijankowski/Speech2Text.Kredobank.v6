@@ -1,0 +1,11 @@
+Extract what reason for the debt the CLIENT stated. If not stated, value must be "".
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

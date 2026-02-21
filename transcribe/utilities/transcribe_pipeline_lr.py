@@ -12,9 +12,10 @@ from core.logger import log
 
 from transcribe.utilities.scenario_tools import Turn, render_timestamped_script_from_turns, remap_turn_roles
 
-from transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario
+from transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario, async_generate_crm_summary_for_call_scenario_ext
 # from transcribe.utilities.transcribe_mono import async_transcribe_mono_audio_file_to_scenario
 from transcribe.utilities.transcribe_mono_lr import async_transcribe_mono_timestamped_lr
+from transcribe.utilities.transcribe_mono_lr2 import async_transcribe_mono_timestamped_lr2
 from transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_timestamped_lr
 from transcribe.utilities.evaluation_interrupts_lr import analyze_turn_overlaps_lr # no async need - just calc
 from transcribe.utilities.evaluation_engine import async_run_scheme
@@ -53,7 +54,7 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
                                                         metadata=metadata 
                                                         )
     else:
-        turns, scenario = await async_transcribe_mono_timestamped_lr(  source_file=source_file,
+        turns, scenario = await async_transcribe_mono_timestamped_lr2(  source_file=source_file,
                                                         temp_root_dir=temp_root_dir,
                                                         metadata=metadata 
                                                         )
@@ -65,14 +66,15 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
 
 
 async def async_generate_scenario_summary_pipeline(
-    *,
     scenario: str, 
     model_override: str = None) -> str:
       
     log.info("\n\n\n" + "="*30 + " Generating summary " + "="*30)
-    summary = await async_generate_crm_summary_for_call_scenario(scenario, model=model_override)
-    # log.info("\n" + str(summary))
-    return summary
+    # summary = await async_generate_crm_summary_for_call_scenario(scenario, model=model_override)
+    summary = await async_generate_crm_summary_for_call_scenario_ext(scenario, model=model_override)
+    log.info("\n" + json.dumps(summary, ensure_ascii=False, indent=2))
+    return json.dumps(summary, ensure_ascii=False, indent=2)
+
 
 
 

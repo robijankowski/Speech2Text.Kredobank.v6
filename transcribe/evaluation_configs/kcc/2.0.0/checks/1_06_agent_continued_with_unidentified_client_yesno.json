@@ -1,0 +1,12 @@
+{
+  "id": "1_06_agent_continued_with_unidentified_client_yesno",
+  "desc": "Agent continued the conversation with an unidentified client",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "agent_continued_with_unidentified_client_yesno_evaluation",
+  "system_prompt_file": "prompts/1_06_agent_continued_with_unidentified_client_system.txt",
+  "user_prompt_file": "prompts/1_06_agent_continued_with_unidentified_client_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

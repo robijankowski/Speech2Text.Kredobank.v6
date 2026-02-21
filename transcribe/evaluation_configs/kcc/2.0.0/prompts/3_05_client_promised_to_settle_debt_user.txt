@@ -1,0 +1,11 @@
+Evaluate whether the client promised/committed to settle/pay the debt in the transcript.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

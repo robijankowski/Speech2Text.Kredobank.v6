@@ -1,0 +1,12 @@
+{
+  "id": "1_01_agent_greeting",
+  "desc": "Agent greeted the client (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "agent_greeting_evaluation",
+  "system_prompt_file": "prompts/1_01_greeting_system.txt",
+  "user_prompt_file": "prompts/1_01_greeting_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

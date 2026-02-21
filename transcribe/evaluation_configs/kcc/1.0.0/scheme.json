@@ -2,7 +2,7 @@
   "system_code": "kcc",
   "name": "KredoBank Collection Calls (example scheme)",
   "version": "1.0.0",
-  "valid_from": "2026-01-01",
+  "valid_from": "1900-01-01",
   "valid_to": null,
   "default_model": "gpt-4o",
   "checks": [

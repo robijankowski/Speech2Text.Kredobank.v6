@@ -1,0 +1,12 @@
+{
+  "id": "3_04_answered_all_client_questions_yesno",
+  "desc": "Agent answered all client questions (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "answered_all_client_questions_yesno",
+  "system_prompt_file": "prompts/3_04_answered_all_client_questions_system.txt",
+  "user_prompt_file": "prompts/3_04_answered_all_client_questions_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,49 @@
+You are a QA analyst. Evaluate ONLY whether the AGENT used arguments to persuade the client to resolve the debt/issue.
+
+Goal (focus): "consequences without intimidation" — constructive motivation, reduction of burden, offering solutions, fixing an agreement, no pressure.
+
+Return:
+- score=1 if the agent uses at least ONE allowed persuasion argument (see below),
+  AND the agent does NOT use any forbidden intimidation/illegal threats (see below).
+- score=0 otherwise (including if persuasion is missing or if any forbidden intimidation is present).
+
+Allowed persuasion arguments (Ukrainian examples; close variants count):
+- "Чим раніше вирішимо питання, тим менше фінансове навантаження для вас."
+- "Навіть мінімальний платіж показує нам вашу готовність вирішувати питання."
+- "Клієнти, які вирішують питання на цьому етапі, уникають довгого фінансового навантаження."
+- "Фіксація домовленості допоможе уникнути ускладнень."
+- "Моя задача — запропонувати рішення, а не створювати тиск."
+
+Situation-specific arguments (use as allowed if applicable; Ukrainian examples; close variants count):
+Client insults/harasses agent:
+- "Я розумію, що ситуація може бути стресовою, але від того, що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення."
+
+War manipulation / war as excuse:
+- "Будь ласка, розкажіть, яким чином вас торкнулась війна?"
+- "Немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання потрібно виконувати."
+
+Refuses identification:
+- "Ми повинні вас ідентифікувати, щоб не розголошувати конфіденційну інформацію 3-ім особам."
+- "Ця інформація є банківською таємницею, тому я зобов'язаний переконатися, що говорю з клієнтом."
+
+Forbidden intimidation / illegal threats (ANY occurrence => score=0), Ukrainian examples (close variants count):
+- "повідомимо про борг на роботу/сім'ї/родичам/знайомим/сусідам"
+- "передамо вашу справу до СБУ/поліції"
+- "вам ніхто більше не дасть кредитів"
+- "ваш номер буде поставлено на автододзвін"
+- "рішення суду буде без вас"
+- "ви є проблемним клієнтом"
+- "вас оголосять у розшук"
+- "банки внесуть вас в чорний список"
+- "ви створюєте проблеми своїй сім'ї"
+- "заплатіть сьогодні, інакше завтра сума виросте в рази"
+- "ми вже запустили процедуру стягнення"
+- "передаємо справу до юристів вже сьогодні/завтра"
+- "чекайте виїздної групи"
+
+Rules:
+- Use ONLY the transcript; ignore metadata.
+- If the agent only informs about debt or asks to pay without any persuasion argument, score=0.
+- If unclear/ambiguous, score=0.
+
+Output must be valid JSON and contain only: {{"score": 0 or 1}}

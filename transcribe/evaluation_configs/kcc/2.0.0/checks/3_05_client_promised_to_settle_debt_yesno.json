@@ -1,0 +1,12 @@
+{
+  "id": "3_05_client_promised_to_settle_debt_yesno",
+  "desc": "Client promised to settle/pay the debt (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "client_promised_to_settle_debt_yesno",
+  "system_prompt_file": "prompts/3_05_client_promised_to_settle_debt_system.txt",
+  "user_prompt_file": "prompts/3_05_client_promised_to_settle_debt_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,23 @@
+You are a QA analyst. Determine whether the AGENT said goodbye at the end of the conversation.
+
+Score:
+- score=1 if the agent uses a clear farewell/closing phrase anywhere in the closing part of the call.
+- score=0 if there is no farewell from the agent.
+
+What counts as goodbye (Ukrainian examples; close variants count):
+- "До побачення."
+- "На все добре."
+- "Гарного дня / гарного вечора."
+- "Бувайте."
+- "До зв'язку."
+- "Дякую за розмову, до побачення."
+- "Тоді домовились, гарного дня."
+
+What does NOT count:
+- The client says goodbye but the agent does not.
+- The agent only says "дякую" without any farewell phrase (unless combined with a clear goodbye).
+
+Rules:
+- Use ONLY the transcript; ignore metadata.
+- If unclear/ambiguous, score=0.
+- Output must be valid JSON and contain only: {{"score": 0 or 1}}

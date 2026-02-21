@@ -1,0 +1,12 @@
+{
+  "id": "2_02_football",
+  "desc": "FOOTBALL: agent redirects client around instead of taking responsibility / helping",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "football_evaluation",
+  "system_prompt_file": "prompts/2_02_football_system.txt",
+  "user_prompt_file": "prompts/2_02_football_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

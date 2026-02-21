@@ -1,0 +1,12 @@
+{
+  "id": "2_05_paraphrased_client",
+  "desc": "Agent paraphrased the client to confirm understanding",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "paraphrased_client_evaluation",
+  "system_prompt_file": "prompts/2_05_paraphrased_client_system.txt",
+  "user_prompt_file": "prompts/2_05_paraphrased_client_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,11 @@
+Evaluate whether the agent said goodbye in the transcript.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

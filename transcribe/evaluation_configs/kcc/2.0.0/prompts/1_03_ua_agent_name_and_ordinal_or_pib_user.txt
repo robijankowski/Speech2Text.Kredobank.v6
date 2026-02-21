@@ -1,0 +1,13 @@
+Evaluate ONLY whether the agent identified themselves by saying:
+(A) their name AND their ordinal number, OR
+(B) their PIB (full name / surname).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

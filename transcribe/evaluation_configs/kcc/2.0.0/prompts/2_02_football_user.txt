@@ -1,0 +1,11 @@
+Evaluate whether the AGENT demonstrates "FOOTBALL" behavior (redirecting the client around without ownership).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

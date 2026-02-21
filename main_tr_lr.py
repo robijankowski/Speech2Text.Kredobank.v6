@@ -141,7 +141,18 @@ SAMPLE_REQUEST_JSON = r'''{
 
 
 
-CALL_INFO = {"callType":"debt", "phoneType":"fin", "dpd":"dpd30"}
+CALL_INFO = { "finphone": "FINPHONEYES_", 
+             "finphone3": "COMPANYPHONE_", 
+             "finphone2": "FINPHONENO_",
+             "debtreason": "DEBTREASON_", 
+             "outbdounf": "CALLOUT_", 
+             "dpd151": "DPD15_", 
+             "dpd152": "DPD1530_", 
+             "dpd153": "DPD3060_", 
+             "dpd154": "DPD30GTOR_", 
+             "dpd155": "DPD6090_", 
+             "dpd156": "DPD90PLUS_", 
+             }
 CALL_DATE = date(2026, 1,15)
 SYSTEM_CODE = "kcc"
 
@@ -152,6 +163,7 @@ from transcribe.utilities.transcribe_pipeline_lr import ( async_transcribe_audio
                                                           async_run_analysis_of_the_transcription_pipeline,
                                                           async_evaluate_conversation_interrupts_pipeline,
                                                           )
+
 
 
 async def async_run_transcription(start_index=0, end_index=None):
@@ -172,23 +184,25 @@ async def async_run_transcription(start_index=0, end_index=None):
 
 
             
-            log.info("\n\n" + "=" * 60 + f"\nRunning transcription for file name: '{audio_file}'\n")
-            turns, scenario = await async_transcribe_audio_file_to_scenario_pipeline( source_file=audio_file,
-                                                          temp_root_dir=settings.TR_TEMP_ROOT_DIR,
-                                                          metadata=metadata_json 
-                                                          )
-            log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
+            # log.info("\n\n" + "=" * 60 + f"\nRunning transcription for file name: '{audio_file}'\n")
+            # turns, scenario = await async_transcribe_audio_file_to_scenario_pipeline( source_file=audio_file,
+            #                                               temp_root_dir=settings.TR_TEMP_ROOT_DIR,
+            #                                               metadata=metadata_json 
+            #                                               )
+            # log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
 
-            # return
+            scenario = TEST_SCENARIO
+
             log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
             summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
             log.info(f"Summary for file number {audio_file} :\n{summary}")
 
-
-            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
-            res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, file_name=audio_file) # this is not async - pure calcs.
-            log.info(f"Evaluation interrupts result {audio_file} :\n{res_interrupts}")
-
+            return
+            # log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
+            # res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, file_name=audio_file) # this is not async - pure calcs.
+            # log.info(f"Evaluation interrupts result {audio_file} :\n{res_interrupts}")
+            scenario = TEST_SCENARIO
+            res_interrupts = {}
             log.info("\n\n" + "=" * 60 + f"\nRunning evaluation for file name: '{audio_file}'\n")
             res, success = await async_evaluate_transcripted_scenario_pipeline( scenario=scenario,
                                                                     metadata=metadata_json,
@@ -200,6 +214,7 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                                     )
             log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, indent=2)}")
 
+            return
             log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for  file name: '{audio_file}'\n")
             request = json.loads(SAMPLE_REQUEST_JSON) #simluation of phase 2 - analysis on free questions
             request["conversation"] = scenario
@@ -219,4 +234,4 @@ async def async_run_transcription(start_index=0, end_index=None):
 
 # Run the main function
 if __name__ == "__main__":
-    asyncio.run(async_run_transcription(1,1))  # Change indices to process specific files or ranges
+    asyncio.run(async_run_transcription(0,0))  # Change indices to process specific files or ranges

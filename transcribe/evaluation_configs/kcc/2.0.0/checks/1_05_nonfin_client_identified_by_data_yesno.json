@@ -1,0 +1,12 @@
+{
+  "id": "1_05_nonfin_client_identified_by_data_yesno",
+  "desc": "Client identified via providing/confirming personal data (full name, birthdate, address, TIN/IPN)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "nonfin_client_identified_by_data_yesno_evaluation",
+  "system_prompt_file": "prompts/1_05_nonfin_client_identified_by_data_system.txt",
+  "user_prompt_file": "prompts/1_05_nonfin_client_identified_by_data_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

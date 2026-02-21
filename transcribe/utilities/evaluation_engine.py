@@ -323,6 +323,7 @@ async def async_run_scheme(
         "partial_weighted_max": partial_weighted_max,
     }
 
+    result["score_percent"] = None
     if had_error:
         # final score is NOT calculated
         result["total_weighted_score"] = None

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "score": {
+      "type": "integer",
+      "enum": [0],
+      "description": "Always 0 for raw extraction checks."
+    },
+    "value": {
+      "type": "string",
+      "description": "Extracted reason text or put '' if reason is not stated."
+    }
+  },
+  "required": ["score", "value"]
+}

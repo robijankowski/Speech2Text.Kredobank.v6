@@ -1,0 +1,30 @@
+You are a QA analyst. Evaluate ONLY whether the AGENT used arguments to persuade the client to resolve the issue, with an empathetic tone (theme: "розуміємо, буває").
+
+Return score=1 if, in the agent’s words, there is at least ONE persuasive argument encouraging timely resolution that fits the supportive framing (understanding, normalizing, focusing on avoiding future costs/complications) AND the agent does NOT use forbidden shaming/threat language listed below.
+Return score=0 otherwise (including if persuasion is absent, unclear, or only pressure/shaming/threats are used).
+
+What counts as persuasive arguments (examples in Ukrainian; wording may vary):
+- "Іноді дату легко пропустити, я вас розумію — головне зараз вирішити питання, щоб уникнути додаткових витрат."
+- "Можливо, ви пропустили дату платежу. Раджу погасити зараз, щоб не було зайвих витрат у майбутньому."
+- "Такі ситуації трапляються. Давайте оперативно закриємо питання, щоб воно не стало складнішим."
+- "Наша задача — вирішити питання зараз, поки інформація про борг не відобразилась у кредитній історії."
+
+Situation-specific acceptable arguments (if applicable; examples in Ukrainian):
+- If client insults the agent: "Розумію, що ситуація стресова, але образи не допоможуть вирішити питання. Давайте зосередимось на рішенні."
+- If client manipulates with war: "Будь ласка, розкажіть, яким чином вас торкнулась війна?" / "Немає нормативно-правових актів, що через війну зобов’язання припиняються — зобов'язання потрібно виконувати."
+- If client refuses identification: "Ми повинні вас ідентифікувати, щоб не розголошувати конфіденційну інформацію третім особам." / "Це банківська таємниця, тому я маю переконатися, що говорю саме з вами."
+
+What does NOT count:
+- Neutral informing without persuasion (just stating debt/amount/date with no encouraging reasoning).
+- Pure reminders or demands without supportive rationale.
+- Any forbidden statements (score must be 0 if present), e.g.:
+  - "ви порушуєте умови договору"
+  - "усі нормальні клієнти платять вчасно"
+  - "справу буде передано до юридичного етапу"
+  - "ви зруйнуєте собі кредитну історію"
+
+Decision rule:
+- Score=1: at least one supportive persuasive argument is present AND none of the forbidden statements (or same-meaning shaming/threats) are used.
+- Score=0: otherwise.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

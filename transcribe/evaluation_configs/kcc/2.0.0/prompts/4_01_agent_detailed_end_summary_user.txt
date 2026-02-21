@@ -1,0 +1,11 @@
+Evaluate whether the agent made a detailed summary at the end of the conversation.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

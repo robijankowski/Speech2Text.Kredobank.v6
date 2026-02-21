@@ -1,0 +1,12 @@
+{
+  "id": "1_03_agent_name_and_ordinal_or_pib_yesno",
+  "desc": "Agent identified themselves by (name + ordinal number) OR (PIB/full name)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "ua_agent_name_and_ordinal_or_pib_yesno_evaluation",
+  "system_prompt_file": "prompts/1_03_ua_agent_name_and_ordinal_or_pib_system.txt",
+  "user_prompt_file": "prompts/1_03_ua_agent_name_and_ordinal_or_pib_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

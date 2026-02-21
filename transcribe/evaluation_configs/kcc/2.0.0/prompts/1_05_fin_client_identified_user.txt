@@ -1,0 +1,11 @@
+Evaluate whether the CLIENT is identified based on the CLIENT's response to an identity/verification question.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

@@ -1,0 +1,11 @@
+Evaluate whether the AGENT asked the CLIENT about the reason/cause of the debt (why it occurred / why not paid).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

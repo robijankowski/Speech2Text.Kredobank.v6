@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent disclosed that the call/conversation is being recorded.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

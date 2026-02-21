@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent asked if it is convenient/okay for the client to talk right now.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

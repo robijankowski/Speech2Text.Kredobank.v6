@@ -1,0 +1,12 @@
+{
+  "id": "3_01_dpd30plusgtor_persuasion_args_guarantor",
+  "desc": "Agent used arguments to persuade guarantor to resolve the issue (guarantor responsibility) (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "dpd30plusgtor_persuasion_args_guarantor_evaluation",
+  "system_prompt_file": "prompts/3_01_dpd30plusgtor_persuasion_args_guarantor_system.txt",
+  "user_prompt_file": "prompts/3_01_dpd30plusgtor_persuasion_args_guarantor_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

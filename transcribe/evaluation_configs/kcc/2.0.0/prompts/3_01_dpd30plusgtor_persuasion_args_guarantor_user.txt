@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent used persuasive arguments to encourage resolving the issue in a guarantor (поручитель) conversation, focusing on guarantor responsibility and that the guarantee is not a formality.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

@@ -1,0 +1,12 @@
+{
+  "id": "1_04_call_reason_contract_number_yesno",
+  "desc": "Agent stated the reason for the call by referencing a credit contract / auto loan / mortgage / overdraft number",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "call_reason_contract_number_yesno_evaluation",
+  "system_prompt_file": "prompts/1_04_call_reason_contract_number_system.txt",
+  "user_prompt_file": "prompts/1_04_call_reason_contract_number_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,11 @@
+Evaluate whether the agent used persuasion arguments by warning about standard consequences / escalation (DPD 90+) and/or offering how to avoid them.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

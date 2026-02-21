@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent paraphrased the client (re-stated the client's message in the agent's own words) to confirm understanding.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

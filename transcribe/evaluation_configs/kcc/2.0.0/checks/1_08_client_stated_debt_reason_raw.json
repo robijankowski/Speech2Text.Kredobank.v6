@@ -1,0 +1,12 @@
+{
+  "id": "1_08_client_stated_debt_reason_raw",
+  "desc": "Raw extract: what reason for the debt the client stated",
+  "weight": 0.0,
+  "max_points": 0,
+  "temperature": 0.0,
+  "schema_name": "client_stated_debt_reason_raw_extraction",
+  "system_prompt_file": "prompts/1_08_client_stated_debt_reason_raw_system.txt",
+  "user_prompt_file": "prompts/1_08_client_stated_debt_reason_raw_user.txt",
+  "response_schema_file": "schemas/text_value.schema.json",
+  "result_key": "score"
+}

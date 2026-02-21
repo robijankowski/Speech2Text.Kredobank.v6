@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent used acceptable persuasive arguments to motivate the client to resolve the issue.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

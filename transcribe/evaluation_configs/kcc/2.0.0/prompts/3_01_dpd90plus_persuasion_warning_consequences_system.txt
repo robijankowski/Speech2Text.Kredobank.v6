@@ -1,0 +1,55 @@
+You are a QA analyst. Evaluate ONLY whether the AGENT used arguments to persuade the client to resolve the issue by:
+(1) honestly warning about standard consequences / escalation of the situation, AND/OR
+(2) explaining how to avoid those consequences (offer solution, propose next step, fix agreement).
+
+Return:
+- score=1 if the agent uses at least ONE allowed “warning / escalation / standard consequences” persuasion argument (see below)
+  AND the agent does NOT use any forbidden intimidation/illegal threats (see below).
+- score=0 otherwise (including if persuasion is missing or if any forbidden intimidation is present).
+
+Allowed persuasion arguments (Ukrainian examples; close variants count):
+- "Я попереджаю про стандартні наслідки."
+- "Ситуація переходить у складнішу стадію, я чесно попереджаю про наслідки і пропоную, як їх уникнути."
+- "У випадку судового розгляду Ви не лише сплатите суму боргу, але й додаткові витрати, такі як судові збори та витрати на виконання рішення суду."
+- "Ви розумієте, якщо порушуються умови кредитної угоди, то Банк може звернутись до суду для повернення усієї суми кредиту?"
+- "Ви усвідомлюєте, якщо справа дійде до суду, то Вам необхідно буде платити судові витрати?"
+- "Невже ви хочете, щоб вам арештували рахунки?" — allowed ONLY if framed as a possible standard outcome and paired with a way to avoid it (e.g., payment plan, minimal payment, fixing agreement). If used as pressure without solution, treat as unclear => score=0.
+
+What DOES count as persuasion:
+- Warning about escalation (court possibility, extra costs, enforcement consequences) + proposal of concrete steps to avoid (pay now, minimal payment, restructuring, agreement on date, installment plan).
+- “Standard consequences” stated neutrally as possibilities (“може”, “у випадку”, “якщо”) rather than certain threats.
+
+What does NOT count:
+- Purely informing about the debt amount or asking to pay, without any warning/argument or without offering how to avoid consequences.
+
+Forbidden intimidation / illegal threats (ANY occurrence => score=0), Ukrainian examples (close variants count):
+- "повідомимо про борг на роботу/сім'ї/родичам/знайомим/сусідам"
+- "передамо вашу справу до СБУ/поліції"
+- "вам ніхто більше не дасть кредитів"
+- "ваш номер буде поставлено на автододзвін"
+- "рішення суду буде без вас"
+- "ви є проблемним клієнтом"
+- "вас оголосять у розшук"
+- "банки внесуть вас в чорний список"
+- "ви створюєте проблеми своїй сім'ї"
+- "заплатіть сьогодні, інакше завтра сума виросте в рази"
+- "ми вже запустили процедуру стягнення"
+- "передаємо справу до юристів вже сьогодні/завтра"
+- "чекайте виїздної групи"
+
+Situation-specific arguments (allowed if applicable; Ukrainian examples; close variants count):
+Client insults/harasses agent:
+- "Я розумію, що ситуація може бути стресовою, але від того, що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення."
+
+War manipulation / war as excuse:
+- "Будь ласка, розкажіть, яким чином вас торкнулась війна?"
+- "Немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання потрібно виконувати."
+
+Refuses identification:
+- "Ми повинні вас ідентифікувати, щоб не розголошувати конфіденційну інформацію 3-ім особам."
+- "Ця інформація є банківською таємницею, тому я зобов'язаний переконатися, що говорю з клієнтом."
+
+Rules:
+- Use ONLY the transcript; ignore metadata.
+- If unclear/ambiguous, score=0.
+- Output must be valid JSON and contain only: {{"score": 0 or 1}}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -45,6 +46,22 @@ def _load_scheme_meta(scheme_path: Path) -> SchemeMeta:
         scheme_path=scheme_path,
     )
 
+def _version_key(v: str):
+    """
+    Comparable key for versions like: 1.2.10, 2.0, 1.0.0-beta
+    Numeric parts sort numerically, non-numeric lexicographically.
+    """
+    parts = re.split(r"[.\-_+]", (v or "").strip())
+    key = []
+    for p in parts:
+        if p == "":
+            continue
+        if p.isdigit():
+            key.append((0, int(p)))
+        else:
+            key.append((1, p.lower()))
+    return tuple(key)
+
 
 def list_schemes_for_system(config_root: str | Path, system_code: str) -> List[SchemeMeta]:
     """
@@ -60,6 +77,8 @@ def list_schemes_for_system(config_root: str | Path, system_code: str) -> List[S
         metas.append(_load_scheme_meta(scheme_path))
 
     return metas
+
+
 
 
 def resolve_scheme_path(
@@ -79,23 +98,20 @@ def resolve_scheme_path(
                 return m.scheme_path
         raise FileNotFoundError(f"No scheme.json for system_code={system_code} version={version}")
 
-    # pick the scheme whose validity window contains call_date
+    # pick schemes whose validity window contains call_date
     candidates = []
     for m in metas:
         if m.valid_from <= call_date and (m.valid_to is None or call_date <= m.valid_to):
             candidates.append(m)
 
     if not candidates:
-        raise ValueError(
-            f"No active scheme for system_code={system_code} on {call_date.isoformat()}"
-        )
+        raise ValueError(f"No active scheme for system_code={system_code} on {call_date.isoformat()}")
 
-    # If multiple match, pick the one with latest valid_from (most specific/recent)
-    candidates.sort(key=lambda x: x.valid_from, reverse=True)
-    return candidates[0].scheme_path
-
-
-
+    # NEW: pick latest valid_from, then highest version within that valid_from
+    latest_vf = max(m.valid_from for m in candidates)
+    latest_candidates = [m for m in candidates if m.valid_from == latest_vf]
+    latest_candidates.sort(key=lambda m: _version_key(m.version), reverse=True)
+    return latest_candidates[0].scheme_path
 
 
 

@@ -1,0 +1,11 @@
+Evaluate whether the CLIENT is identified via personal data verification (full name, birthdate, address, TIN/IPN).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

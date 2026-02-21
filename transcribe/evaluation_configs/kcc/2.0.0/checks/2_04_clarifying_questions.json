@@ -1,0 +1,12 @@
+{
+  "id": "2_04_clarifying_questions",
+  "desc": "Agent used clarifying questions to understand the client's situation",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "clarifying_questions_evaluation",
+  "system_prompt_file": "prompts/2_04_clarifying_questions_system.txt",
+  "user_prompt_file": "prompts/2_04_clarifying_questions_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

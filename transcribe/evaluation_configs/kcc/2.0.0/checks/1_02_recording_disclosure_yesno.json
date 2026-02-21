@@ -1,0 +1,12 @@
+{
+  "id": "1_02_recording_disclosure_yesno",
+  "desc": "Agent disclosed that the call/conversation is being recorded (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "recording_disclosure_yesno_evaluation",
+  "system_prompt_file": "prompts/1_02_recording_disclosure_system.txt",
+  "user_prompt_file": "prompts/1_02_recording_disclosure_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "1_07_agent_asked_debt_reason_yesno",
+  "desc": "Agent asked the client for the reason/cause of the debt",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "agent_asked_debt_reason_yesno_evaluation",
+  "system_prompt_file": "prompts/1_07_agent_asked_debt_reason_system.txt",
+  "user_prompt_file": "prompts/1_07_agent_asked_debt_reason_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

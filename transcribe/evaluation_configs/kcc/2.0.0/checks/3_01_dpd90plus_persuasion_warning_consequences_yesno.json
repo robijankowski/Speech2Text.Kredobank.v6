@@ -1,0 +1,12 @@
+{
+  "id": "3_01_dpd90plus_persuasion_warning_consequences_yesno",
+  "desc": "Agent used persuasion arguments by warning about standard consequences / escalation (DPD 90+): honest warning + how to avoid (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "dpd90plus_persuasion_warning_consequences_yesno",
+  "system_prompt_file": "prompts/3_01_dpd90plus_persuasion_warning_consequences_system.txt",
+  "user_prompt_file": "prompts/3_01_dpd90plus_persuasion_warning_consequences_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

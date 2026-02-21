@@ -1,0 +1,11 @@
+Evaluate whether the agent used persuasion arguments (consequences without intimidation) to motivate resolving the issue.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

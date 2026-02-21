@@ -1,0 +1,12 @@
+{
+  "id": "4_01_agent_detailed_end_summary_yesno",
+  "desc": "Agent provided a detailed summary at the end of the conversation (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "agent_detailed_end_summary_yesno",
+  "system_prompt_file": "prompts/4_01_agent_detailed_end_summary_system.txt",
+  "user_prompt_file": "prompts/4_01_agent_detailed_end_summary_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "2_01_convenient_to_talk",
+  "desc": "Agent asked if it is convenient for the client to talk now (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "convenient_to_talk_evaluation",
+  "system_prompt_file": "prompts/2_01_convenient_to_talk_system.txt",
+  "user_prompt_file": "prompts/2_01_convenient_to_talk_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

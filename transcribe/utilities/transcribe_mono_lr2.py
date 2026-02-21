@@ -18,10 +18,12 @@ from core.logger import log
 from openai_tools.openai_client_transcribe import (
     async_transcribe_audio,
     async_transcribe_audio_diarized,
+    Transcription,
 )
 
 from transcribe.utilities.audio_tools import (
     clean_audio_file_lr,
+    clean_audio_file,
     remove_long_silences_in_audio,
     stereo_to_mono,
 )
@@ -37,38 +39,76 @@ from transcribe.utilities.transcribe_mono_tools import async_classify_all_speake
 
 AudioInput = Union[str, Path, BinaryIO]
 
+def _default_transcription_model() -> str:
+    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+
+
+STEREO_PROMPT_UA = """
+Це запис розмови між клієнтом та оператором KredoBank Україна.
+
+🔸 КРИТИЧНО ВАЖЛИВО - ЗБЕРЕЖЕННЯ ОРИГІНАЛЬНОЇ МОВИ:
+- Транскрибуй ТОЧНО ТАК, ЯК СКАЗАНО, без жодних перекладів. Наприклад, не замінюйте слово «да» на «так».
+- Якщо слово вимовлено українською → записуй українською
+- Якщо слово вимовлено російською → записуй російською  
+- Якщо фраза змішана (суржик) → зберігай кожне слово в оригінальній мові
+- НІКОЛИ не замінюй російські слова українськими еквівалентами
+- НІКОЛИ не "виправляй" мову - записуй автентично
+
+Цей виклик, ймовірно, пов'язаний із роботою відділу стягнення заборгованості банку, 
+і може містити згадки про заборгованість, від'ємний баланс, арешт рахунків, виконавчу службу тощо.
 
 
 
+🔹 У розмові можуть зустрічатися ОБОМА МОВАМИ:
+- Банківські терміни: "від'ємний баланс" / "отрицательный баланс", "рахунок" / "счет", "арешт" / "арест"
+- Звернення: "добрий день" / "добрый день", "дякую" / "спасибо"
+- Назви банківських додатків: "KredoBank", "Кредобанк", "KredoMobile"
+- Службові фрази: "Алло", "Мене звати" / "Меня зовут", "Наша розмова записується" / "Наш разговор записывается"
 
-# def merge_adjacent_turns1111(turns: List[Turn], *, gap_sec: float = 0.8) -> List[Turn]:
-#     """
-#     Merge adjacent turns if:
-#       - same role
-#       - gap between them <= gap_sec
-#     Keeps start/end timestamps spanning the merged turns.
-#     """
-#     if not turns:
-#         return []
+🔹 ПРИКЛАДИ правильної транскрипції змішаного мовлення:
+- "Добрий день, у мене отрицательный баланс на счету" ✓
+- "Алло, можете сказать, чому в мене від'ємний баланс?" ✓  
+- "Спасибо, до побачення" ✓
 
-#     turns_sorted = sorted(turns, key=lambda x: (x.start, x.end))
-#     merged: List[Turn] = [turns_sorted[0]]
+🔹 Інструкції для транскрипції:
+- Зберігай всі слова, включно зі словами-паразитами ("ну", "добре", "може", "трошки", "ммм", "это", "вот")
+- Не пропускай повторення або вагання
+- Використовуй правильну пунктуацію для природного усного мовлення
+- Мовна автентичність важливіша за мовну "чистоту". 
+- ЗАВЖДИ ЗБЕРІГАЙТЕ РОСІЙСЬКІ СЛОВА, ЯКЩО ВОНИ З'ЯВИЛИСЯ В РОЗМОВІ!
 
-#     for t in turns_sorted[1:]:
-#         last = merged[-1]
-#         gap = t.start - last.end
-#         if t.role == last.role and gap <= gap_sec:
-#             text = (last.text.rstrip() + " " + t.text.lstrip()).strip()
-#             merged[-1] = Turn(role=last.role, start=last.start, end=max(last.end, t.end), text=text)
-#         else:
-#             merged.append(t)
+🔹 Контекстні дані (метадані) для покращення розпізнавання:
+Known entities canonical names: {metadata}
 
-#     return merged
+ПАМ'ЯТАЙ: Твоє завдання - точно відтворити ТЕ, ЩО БУЛО СКАЗАНО, а не те, що "повинно було б" бути сказано!
+"""
+
+async def async_transcript_audio_file_verbose_o4_stereo(file_name: str, 
+                                            o4_metadata_text="", 
+                                            temperature=0.0,
+                                            model: str = ""
+                                            ) -> Transcription:
+    
+    prompt = STEREO_PROMPT_UA.format(metadata=o4_metadata_text or "")
+
+    if not model:
+        model = _default_transcription_model()
+
+    transcription = await async_transcribe_audio(
+        audio=file_name,
+        model=model,
+        prompt=prompt,
+        temperature=temperature,
+        response_format="json",
+        timestamp_granularities=["segment"],
+    )
+    log.info(f"File transcription done with model: {model}:")
+    log.info("\n" + str(transcription.usage))   
+
+    return transcription
 
 
-# =========================
-# Audio slicing primitives
-# =========================
+
 
 def slice_wav(in_wav: str, out_wav: str, start_s: float, end_s: float, pad_ms: int = 250) -> str:
     audio = AudioSegment.from_file(in_wav)
@@ -79,21 +119,6 @@ def slice_wav(in_wav: str, out_wav: str, start_s: float, end_s: float, pad_ms: i
     return out_wav
 
 
-# def extract_diarize_bounds111(diarized: Any) -> List[Tuple[float, float]]:
-#     """Extract (start,end) from diarized result."""
-#     segs = getattr(diarized, "segments", None) or (diarized.get("segments", []) if isinstance(diarized, dict) else [])
-#     bounds: List[Tuple[float, float]] = []
-#     for s in segs:
-#         st = getattr(s, "start", None) if not isinstance(s, dict) else s.get("start")
-#         en = getattr(s, "end", None) if not isinstance(s, dict) else s.get("end")
-#         if st is None or en is None:
-#             continue
-#         st_f = float(st)
-#         en_f = float(en)
-#         if en_f > st_f:
-#             bounds.append((st_f, en_f))
-#     bounds.sort(key=lambda x: x[0])
-#     return bounds
 
 
 def _as_dict(obj: Any) -> Dict[str, Any]:
@@ -172,7 +197,7 @@ def prepare_audio_for_transcription_mono(
         audio.export(work_path, format="wav")
 
     # Clean (normalize + NR) + remove long silences
-    cleaned = clean_audio_file_lr(work_path)
+    cleaned = clean_audio_file(work_path)
     cleaned = remove_long_silences_in_audio(cleaned)
     return cleaned
 
@@ -594,7 +619,7 @@ def remap_diar_speakers(
 
 
 
-async def async_transcribe_mono_timestamped_lr(
+async def async_transcribe_mono_timestamped_lr2(
     source_file: str,
     temp_root_dir: Optional[str] = None,
     language: str = "uk",
@@ -628,9 +653,22 @@ async def async_transcribe_mono_timestamped_lr(
         max_phrase_s=15.0,
     )
 
-    info_diar_segs = render_timestamped_script_from_turns(turns)
+    info_diar_segs = render_timestamped_script_from_turns(turns, timestamp_on=False)
     log.info(f"\n\n=== Parsed remapped turns ===\n{info_diar_segs}")
 
+    tr = await async_transcript_audio_file_verbose_o4_stereo( file_name= mono_cleaned,
+                                                             o4_metadata_text=json.dumps(metadata, ensure_ascii=False))
+
+    log.info(tr.text)
+
+    # scenario2 = await async_correct_scenario_using_full_text(scenario_text=info_diar_segs, full_text=tr.text)
+    scenario2 = await async_split_transcription_into_roles_4o(scenario_text= info_diar_segs,
+                                            stereo_text= tr.text,
+                                            metadata_text=json.dumps(metadata, ensure_ascii=False)
+                                            )
+    log.info(scenario2)
+
+    return turns, info_diar_segs
     pad_s = chunk_pad_ms / 1000.0
     turns = extend_chunk_ends_turns(turns, extend_s=3.0, pad_s=pad_s, safety_s=1)
     turns = sorted(turns, key=lambda x: (x.start, x.end))
@@ -649,5 +687,205 @@ async def async_transcribe_mono_timestamped_lr(
     log.info(f"\n=== Final script ===\n{script}")
 
     return res_turns, script
+
+
+SYSTEM_PROMPT = (
+    "You are correcting a diarized scenario of a phone call (bank AGENT vs CLIENT).\n"
+    "You must only correct wording inside each scenario turn using the provided FULL transcript.\n"
+    "Do NOT invent new content.\n"
+)
+
+USER_PROMPT_TEMPLATE = """\
+We have:
+
+1) SCENARIO (timestamps+roles are correct, wording may be noisy):
+<SCENARIO>
+{scenario}
+</SCENARIO>
+
+2) FULL TRANSCRIPT (best transcription of the whole call; use as the source of truth):
+<FULL_TEXT>
+{full_text}
+</FULL_TEXT>
+
+TASK:
+- For EACH scenario line, replace its spoken text with the best matching phrase from FULL_TEXT.
+- Keep EXACTLY the same number of lines, same order, same timestamps, same speaker labels.
+- Do NOT merge or split scenario lines.
+- Use only words that appear in FULL_TEXT (you may choose the best matching contiguous fragment).
+- Keep UA/RU exactly as in FULL_TEXT (no translation).
+- If a scenario line has no matching words in FULL_TEXT, keep it unchanged.
+
+OUTPUT:
+Return ONLY the corrected scenario, same format as input scenario.
+"""
+
+
+import json
+from typing import Any, Dict
+
+from core.config import settings
+from openai_tools.openai_client_text import async_chat_completion_with_format, async_chat_completion  # :contentReference[oaicite:1]{index=1}
+
+SCHEMA_CORRECTED_SCENARIO = {
+    "type": "object",
+    "properties": {
+        "scenario": {"type": "string"},
+    },
+    "required": ["scenario"],
+    "additionalProperties": False,
+}
+
+async def async_correct_scenario_using_full_text(
+    scenario_text: str,
+    full_text: str,
+    model: str = "",
+) -> str:
+    """
+    Ask LLM to correct each scenario turn using the full transcript as source-of-truth.
+    Returns corrected scenario string.
+    """
+    system_prompt = SYSTEM_PROMPT
+    user_prompt = USER_PROMPT_TEMPLATE.format(scenario=scenario_text.strip(), full_text=full_text.strip())
+
+    if not model:
+        # pick a chat model you already use for text tasks
+        model = (
+            settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER
+            if settings.USE_AZURE_OPENAI == "Y"
+            else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
+        )
+
+    resp = await async_chat_completion_with_format(
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        format_schema=SCHEMA_CORRECTED_SCENARIO,
+        schema_name="corrected_scenario",
+        model=model,
+        temperature=0.0,
+    )
+
+    data = json.loads(resp.choices[0].message.content)
+    return (data.get("scenario") or "").strip()
+
+
+
+
+
+
+async def async_split_transcription_into_roles_4o(scenario_text, stereo_text, 
+                                      metadata_text="", 
+                                      model: str = "") -> str:
+    SYSTEM_PROMPT = """
+You are a highly accurate transcription and dialogue reconstruction assistant with specialized expertise in speaker identification.
+
+You receive separate transcriptions of a bilingual phone call between two speakers — a bank **agent** and a **client** — from different audio channels (agent, client, stereo). Your task is to **merge them into a complete, speaker-labeled script** with PERFECT speaker assignment accuracy.
+
+This conversation takes place between a **KredoBank Ukraine collections agent** and a **KredoBank client**, most likely concerning **outstanding debt, negative balance, account restrictions, or enforcement actions**.
+
+CRITICAL REQUIREMENTS:
+1. **COMPLETE PRESERVATION**: You MUST preserve EVERY SINGLE PHRASE, WORD, NAMES of people and UTTERANCE from the STEREO transcript
+2. **ACCURATE SPEAKER ASSIGNMENT**: You MUST verify each utterance's speaker by cross-referencing with individual channel transcripts
+3. **ORDER OF SENTENCES**: You MUST preserve order of sentences in STEREO transcript.
+
+Your methodology:
+* Use the **STEREO channel transcript as the complete foundation** — every word from it must appear in your output
+* Use the **AGENT channel** to identify which parts were spoken by the agent
+* Use the **CLIENT channel** to identify which parts were spoken by the client
+* When in doubt, use contextual clues (professional language, banking terms, formal address patterns)
+* Format as a script with clear speaker labels: `AG:` for agent, `CL:` for client
+
+NEVER omit content from the stereo transcript! Your output should be a COMPLETE transcription with 100% accurate speaker assignments.
+"""
+
+    USER_PROMPT = f"""
+You are given three transcripts of a phone call between a KredoBank Ukraine agent and a KredoBank client. The conversation is likely from the bank's collections department and concerns an account debt or negative balance.
+
+Your task is to create a COMPLETE speaker-labeled conversation script that includes EVERY SINGLE PHRASE from the STEREO transcript with PERFECT speaker identification.
+
+Conversation Metadata. Known entities canonical names:
+{metadata_text}
+
+Input Sources:
+AGENT AND CLIENT CHANNEL (AG): <AGENT_CHANNEL>{scenario_text}</AGENT_CHANNEL>  
+STEREO CHANNEL (combined): <STEREO_CHANNEL>{stereo_text}</STEREO_CHANNEL>
+
+MANDATORY SPEAKER VERIFICATION PROCESS:
+
+1. **PRIMARY RULE**: Every word from STEREO transcript MUST appear in your final output
+
+2. **SPEAKER IDENTIFICATION METHODOLOGY**:
+   - For each phrase/utterance in the STEREO transcript, CHECK if it appears in:
+     * AGENT channel → Label as AG:
+     * CLIENT channel → Label as CL:
+     * Both channels → Use contextual analysis (see below)
+     * Neither channel clearly → Use contextual analysis
+
+3. **CONTEXTUAL SPEAKER CLUES**:
+   - **AGENT typically says**: Banking terminology, policy explanations, formal procedures, account details, payment instructions, "KredoBank", professional phrases
+   - **CLIENT typically says**: Personal explanations, questions about their account, emotional responses, informal language, requests for help
+   - **Formal address patterns**: "Пані/Пан [Name]" usually from agent to client
+   - **Ukrainian politeness markers**: Note who uses formal vs informal speech
+
+4. **VERIFICATION CROSS-CHECK**:
+   - After assigning speakers to ALL stereo content, verify each assignment by asking:
+     * "Does this phrase match the tone/content pattern in the AGENT channel?"
+     * "Does this phrase match the tone/content pattern in the CLIENT channel?"
+     * "Is this consistent with bank agent vs client behavior?"
+
+5. **QUALITY CONTROL REQUIREMENTS**:
+   - NO phrase from stereo transcript should be omitted
+   - NO speaker should be assigned randomly - each assignment must be evidence-based
+   - Maintain conversation flow and logical turn-taking
+   - Preserve all natural speech elements (hesitations, fillers, repetitions)
+
+6. **ENHANCEMENT GUIDELINES**: Use AGENT and CLIENT transcripts to:
+   - Clarify unclear words from stereo (but keep original if unclear)
+   - Confirm speaker identity through content matching
+   - Resolve ambiguous speaker assignments
+   - BUT NEVER remove or skip content from stereo
+
+Output Format:
+AG: [complete agent statement - verified against agent channel]
+CL: [complete client statement - verified against client channel]
+AG: [next agent statement - cross-referenced for accuracy]
+CL: [next client statement - cross-referenced for accuracy]
+...
+
+FINAL VERIFICATION CHECKLIST before submitting:
+✓ Every phrase from STEREO transcript appears in output
+✓ Each speaker assignment is supported by channel evidence or strong contextual clues
+✓ Conversation flow is logical and natural
+✓ No content has been omitted, condensed, or summarized
+
+Remember: Your accuracy in speaker identification is critical. Take time to cross-reference each utterance with the individual channel transcripts before making speaker assignments.
+
+Do not include timestamps, metadata, or section headers. Output only the final reconstructed script with verified speaker labels.
+"""
+
+    if not model:
+        model = _default_split_into_roles_model()
+
+    response = await async_chat_completion(
+        model=model,    
+        temperature=0,
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}, 
+                  {"role": "user", "content": USER_PROMPT}]       
+        )
+    
+    log.info(f"Split into roles done with model: {model}:")
+    log.info("\n" + str(response.usage))   
+
+    result = response.choices[0].message.content
+    result = result.replace("```plaintext", "").replace("```", "").replace("\n\n","\n").strip()
+    return result
+
+def _default_split_into_roles_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
+
+
 
 

@@ -1,0 +1,12 @@
+{
+  "id": "3_01_dpd1530_persuasion_arguments",
+  "desc": "Agent used acceptable persuasive arguments to motivate resolving the issue (dpd15-30: reminder + keep normal status)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "dpd1530_persuasion_arguments_evaluation",
+  "system_prompt_file": "prompts/3_01_dpd1530_persuasion_arguments_system.txt",
+  "user_prompt_file": "prompts/3_01_dpd1530_persuasion_arguments_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

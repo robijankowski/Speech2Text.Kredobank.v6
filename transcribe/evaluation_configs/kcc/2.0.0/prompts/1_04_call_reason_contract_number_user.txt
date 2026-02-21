@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent communicated the reason for the call by referencing a loan/credit contract number (credit contract / auto loan / mortgage / overdraft number).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

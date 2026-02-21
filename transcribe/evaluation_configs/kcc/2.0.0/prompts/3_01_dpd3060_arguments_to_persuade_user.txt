@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent used persuasive arguments (choice/options + compliant warning about complications) to convince the client to resolve the issue.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

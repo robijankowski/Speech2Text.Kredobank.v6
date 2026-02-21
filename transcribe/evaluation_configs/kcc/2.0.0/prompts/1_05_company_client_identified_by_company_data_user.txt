@@ -1,0 +1,11 @@
+Evaluate whether the CLIENT (company representative) is identified via company data verification (address, EDRPOU, company name confirmation).
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

@@ -1,0 +1,12 @@
+{
+  "id": "4_02_agent_said_goodbye_yesno",
+  "desc": "Agent said goodbye / closed the call politely (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "agent_said_goodbye_yesno",
+  "system_prompt_file": "prompts/4_02_agent_said_goodbye_system.txt",
+  "user_prompt_file": "prompts/4_02_agent_said_goodbye_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

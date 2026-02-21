@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Score (0 or 1)"
+    }
+  },
+  "required": ["score"],
+  "additionalProperties": false
+}

@@ -1,0 +1,624 @@
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець привітався?
+" It shoudl return 1 if yes and 0 if not. Weight 1. 
+SHow me prompts and configurations. Use english. brackets {} can be only for metadata and transcript. If you need other then always use {{}}.
+If criteria are not clear for you ask questions.
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+
+Фахівець сказав "що розмова записується"
+
+" 
+It shoudl return 1 if yes and 0 if not. Weight 1. 
+SHow me prompts and configurations. Use english. brackets {} can be only for metadata and transcript. If you need other then always use {{}}.
+If criteria are not clear for you ask questions.
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+
+Фахівець сказав "моє ім'я та порядковий номер" або "ПІБ"
+
+" 
+It shoudl return 1 if yes and 0 if not. Weight 1. 
+SHow me prompts and configurations. Use english. brackets {} can be only for metadata and transcript. If you need other then always use {{}}.
+If criteria are not clear for you ask questions.
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+
+Фахівець повідомив причину дзвінка "номер кредитного договору/автокредиту/іпотеки/овердрафту " 
+
+" 
+It shoudl return 1 if yes and 0 if not. Weight 1. 
+SHow me prompts and configurations. Use english. brackets {} can be only for metadata and transcript. If you need other then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_04_ for new files names.
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи був клієнт ідентифікованим?
+question to ask by agent np: Czy rozmawiam z "imię i nazwisko klienta"?
+відповідь клієнта так	результат ідентифікований
+відповідь клієнта ні/не буду підтверджувати/може бути/ можливо/угу/слухаю/продовжуйте	результат неідентифікований
+
+
+
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_05_fin_ for new files names.
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи був клієнт ідентифікованим?
+criteria:
+Agent asks about full name or birthday or address of the client.
+відповідь клієнта дата народження/адреса/ІПН or confirmation of data provided by agent	результат ідентифікований
+відповідь клієнта не названа дата/адреса/іпн або названа неправильно 	результат неідентифікований
+
+
+
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_05_nonfin_ for new files names.
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи був клієнт ідентифікованим?
+criteria:
+Agent asks about company адреса/ЄДРПОУ or name it for confirmation.
+відповідь клієнта названа адреса/іпн or confirmation					результат ідентифікований
+відповідь клієнта не названа адреса/ЄДРПОУ або названа неправильно or not confirmed clearly 			результат неідентифікований
+
+
+
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_05_company_ for new files names.
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи продовжив розмову фахівець з неідентифікованим клієнтом?
+
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_06_ for new files names.
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець спитав причину виникнення боргу?
+
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_07_ for new files names.
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Яку причину  боргу озвучив клієнт?
+
+Класифікатор причин прострочення
+Втрата роботи або доходу
+Затримка заробітньої плати або виплат
+затримка платежів від дебіторів покупців
+зменшення виробництва  зменшення виручки
+Знаходится за кордоном або відрядженні
+Не оплачує через сімейні обставини
+Не розуміє звідки заборгованість
+Отримує дохід в інший день
+Технічні проблеми з внесенням платежу
+Хвороба, лікарня
+інше 
+
+" 
+Score always 0. Weight 0. Max score 0
+It should retrun raw data with string having requested information according to classification. If client did not tell this then in strineg should be empty.
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 1_08_ for new files names.
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець спитав чи зручно розмовляти клієнту?
+" 
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 2_01_ for new files names.
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець футболив клієнта?" 
+
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 2_02_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+
+chcę ocenić rozmowę agent banku/klient w aspekcie "football". jest taki opis tego aspektu:
+
+Футбол 
+Що таке «футбол» у банку?
+«Футбол» у банку — це коли працівники замість того, щоб вирішити питання клієнта або взяти відповідальність, постійно “перекидають” його до інших працівників чи підрозділів.
+По суті, клієнт ходить по колу, але не отримує реальної допомоги.
+ОЗНАКИ 	
+футбол
+"зателефонуйте до контакт-центру
+
+"
+звернуться у відділення
+це не до мене
+я цим не займаюсь
+додаткові ознаки
+фахівець не уточнює суть проблеми 
+не намагається розібратись
+
+не футбол
+давайте допоможу вирішити питання
+я зафіксую ваше питання передам профільному підзрозділу
+вам передзвонять по цьому питанню протягом ___ днів
+Розкажіть що саме сталося?
+додаткові ознаки
+розпитує детально
+пропонує рішення/дію
+wyjaśnij o co chodzi
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець використовував уточнювальні запитання для розуміння ситуації клієнта?
+
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 2_04_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Was there cases when Фахівець перефразовавув клієнта?
+
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 2_05_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+-------------------------------------------------------------------
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+guidelines and score aspects
+фокус на "розуміємо, буває"
+
+бажано
+наша задача - вирішити питання зараз, до того поки інофрмація про борг відобразиться в кредитній історії
+Можливо, Ви пропустили дату платежу. Раджу погасити зараз, щоб уникнути зайвих витрат у майбутньому
+Іноді дату легко пропостити, я вас розумію, головне уникнути додаткових витрат
+Такі ситуації трапляються. Головне – зараз оперативно вирішити питання, щоб воно не стало складнішим
+
+заборонено
+ви порушуєте умови договору
+усі нормальні клієнти платять вчасно
+справу буде передано до юридичного етапу
+ви зруйнуєте собі кредитну історію
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd15_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+---------------------------------------------------------------------------
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+guidelines and score aspects
+фокус на "нагадування + збереження нормального статуса"
+
+
+бажано
+Наближається термін оплати наступного платежу краще вирішити питання зараз, щоб борг не зростав
+Після погашення ми зупинимо всі нагадування, і питання буде повністю закрито
+Оплатіть борг за рахунком для збереження повного доступу до банківських послуг
+Клієнти часто звертаються з питаннями кредитної історії  БКІ івже після прострочки. Тому краще владнати питання зараз
+90% клієнтів банку вчасно оплачуються кредити. 5% погашають борг протягом 30 днів 
+
+
+заборонено
+угоду буде передано в опрацювання колеккторам (аутворсінговим компаніям)
+рахунки будуть заблоковані, заберуть власність
+заборона на виїзд закордон
+сьогодні останній шанс вирішити питання
+справу буде передано до юридичного етапу
+
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd1530_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+-------------------------------------------
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+guidelines and score aspects
+фокус на "вибір + попередити ускладнення"
+
+бажано
+Рекомендую погасити частково борг, щоб уникнути його збільшення
+Можемо розглянути реструктиризацію боргу щоб платежі були комфотними для вас
+Оплатіть заборгованість частково щоб зберегти  доступ до кредитів у майбутньому​
+зараз є можливість закрити ситуацію без довготривалих наслідків
+хочу зафіксувати зручний варіант, щоб ситуація не ускладнювалась далі
+
+
+заборонено
+майно буде арештовано
+заберуть майно, рахунки заблокують
+угоду буде передано до юридичного розгляду
+ви порушуєте законодавство 
+як не будете виконувати графік платежів, то вам відмінять реструктуризацію
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd3060_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+context:
+розмова з поручителем
+
+бажано
+Зрозумійте, порука це не формальність, вона гарантує повернення кредиту банку
+Підписавши договір поруки , Ви взяли на себе відповідальність за весь борг так само як і позичальник
+
+заборонено
+на угоду накладуть виконавче провадження
+
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd30plusgtor_ for new files names.
+Don't generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+guidelines and score aspects
+фокус: наслідки без залякування
+
+бажано
+Чим раніше вирішимо  питання, тим менше фінансове навантаження для вас
+Навіть мінімальний платіж показує нам вашу готовність вирішувати питання
+Клієнти, які вирішують питання на цьому етапі, уникають довгого фінансового навантаження
+фіксація домовленості допоможе уникнути ускладень
+Моя задача - запропонувати рішення, а не створювати тиск
+
+
+заборонено
+повідомимо про борг на роботу/сім'ї/родичам/знайомим/сусідам
+передамо вашу справу до СБУ/поліції
+вам ніхто більше не дасть кредитів
+ваш номер буде поставлено на автододзвін
+рішення суду буде без вас
+ви є проблемним клієнтом
+вас оголосять у розшук
+банки внесуть вас в чорний список
+ви створюєте проблеми своїй сім'ї
+заплатить сьогодні і іншому випадку сума завтра виросте в рази
+ми вже запустили процедуру стягнення
+передаємо справу до юристів вже сьогодні/завтра
+чекайте виїздної групи
+
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd6090_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використав фахівець у розмові аргументи щоб переконати клієнта вирішити питання?
+
+guidelines and score aspects
+фокус: ситуація змінюється, я попереджаю
+
+бажано
+я попереджаю про стандартні наслідки
+ситуація переходить у складнішу стадію, я чесно попереджаю про наслідки і пропоную як їх уникнути
+невже ви хочете щоб вас арештували рахунки?
+У випадку судового розгляду Ви не лише сплатите суму боргу, але й додаткові витрати, такі як судові збори та витрати на виконання рішення суду
+Ви розумієте, якщо порушуються умови кредитної угоди, то Банк може звернутись до суду для повернення усієї суми кредиту ? 
+Ви усвідомлюєте, якщо справа дійде до суду, то Вам необхідно буде платити судові витрати?
+
+
+заборонено
+повідомимо про борг на роботу/сім'ї/родичам/знайомим/сусідам
+передамо вашу справу до СБУ/поліції
+вам ніхто більше не дасть кредитів
+ваш номер буде поставлено на автододзвін
+рішення суду буде без вас
+ви є проблемним клієнтом
+вас оголосять у розшук
+банки внесуть вас в чорний список
+ви створюєте проблеми своїй сім'ї
+заплатить сьогодні і іншому випадку сума завтра виросте в рази
+ми вже запустили процедуру стягнення
+передаємо справу до юристів вже сьогодні/завтра
+чекайте виїздної групи
+
+
+General arguments that should be used in specific situations:
+Клієнт хамить і ображає фахівця:
+•	Я розумію, що ситуація може бути стресовою, але від того що ви мене будете ображати, питання не вирішиться. Образи не допоможуть нам знайти рішення
+маніпуляція війною:
+•	Будь ласка, розкажіть яким чином вас торкнулась війна?
+•	Ви знаєте, немає нормативно-правових актів, що через війну зобов’язання припиняються. Усі невиконані зобов'язання підтреба виконувати
+відмовляється від ідентифікації :
+•	зрозумійте ми повинні Вас ідентифікувати, щоб не розголошувати конфіденційну інформацію  3-ім особам
+•	та інформація яку я хочу повідомити є банківською таємницею, тому я зобов'язаний переконатись що говорю з …
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_01_dpd90plus_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Чи використовував методи переговорів? Agent should use one or both methods:
+1. Три "так"
+Це техніка, коли клієнта підводять до згоди через серію простих питань, на які легко відповісти “так”.
+Після кількох таких підтверджень людина психологічно схильна погоджуватися і на важливішу пропозицію — оплату.
+Наприклад 
+– Ви можете зараз спілкуватись, так?
+– Так.
+– Ви знаєте, що у вас прострочення за кредитом?
+– Так.
+– Розумієте, що чим раніше його погасити, тим менше витрат буде?
+– Так.
+– Тоді пропоную сьогодні закрити прострочення. Який спосіб оплати вам зручний?
+
+2. Вибір без вибору
+Фахівець пропонує клієнту два варіанта вигідні для банку
+Наприклад 
+Як Вам зручніше оплатити — сьогодні чи завтра зранку?»
+
+
+
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_02_ for new files names.
+don'r generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Фахівець відповів на всі питання клієнта?
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_04_ for new files names.
+don't generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+Клієнт обіцяв врегулювати заборгованість?
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 3_05_ for new files names.
+don't generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+
+Чи зробив фахівець деталізованний підсумок розмови в кінці?
+
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 4_01_ for new files names.
+don't generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+
+
+I need to extend the configuration of evaluation. Question is: 
+" 
+
+Фахівець попрощався?
+
+"
+It should return 1 if yes and 0 if not. Weight 1. 
+Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then always use {{}}.
+If criteria are not clear for you ask questions.
+Use prefix 4_02_ for new files names.
+don't generate new answer schema if there is any already fitting.
+
+
+-------------------------------------------
+
+

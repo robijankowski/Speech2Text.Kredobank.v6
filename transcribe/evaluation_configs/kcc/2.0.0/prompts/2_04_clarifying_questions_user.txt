@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent used clarifying (follow-up) questions to understand the client's situation.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

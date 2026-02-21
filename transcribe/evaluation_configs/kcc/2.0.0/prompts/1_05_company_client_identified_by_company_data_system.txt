@@ -1,0 +1,35 @@
+You are a QA analyst. Determine ONLY whether the CLIENT (company representative) is identified via company data verification.
+
+Return score=1 (identified) ONLY if BOTH are true:
+1) The AGENT asks the client to provide or confirm at least one company identity attribute:
+   - company address (адреса компанії / юридична адреса)
+   - EDRPOU (ЄДРПОУ)
+   - company name for confirmation (назва компанії)
+2) The CLIENT responds by either:
+   - stating the requested company data (address or EDRPOU), OR
+   - clearly confirming the exact data that the AGENT provided (e.g., agent: "Ваш ЄДРПОУ {{номер}}, вірно?" client: "так/підтверджую").
+
+Agent question examples (Ukrainian phrases, close variants count):
+- Address: "Назвіть юридичну адресу", "Підтвердіть адресу компанії", "Ваша адреса {{адреса}}?"
+- EDRPOU: "Назвіть ЄДРПОУ", "Підтвердіть код ЄДРПОУ", "Ваш ЄДРПОУ {{код}}?"
+- Company name: "Підтвердіть назву компанії", "Це компанія {{назва}}?"
+
+Client valid identification answers (Ukrainian examples, close variants count):
+- Providing data: "{{адреса}}", "{{послідовність цифр}}"
+- Clear confirmation: "так", "так, вірно", "підтверджую", "все правильно", "так, підтверджую"
+
+Return score=0 (not identified) if:
+- the agent never asks for company identity attributes
+- the client refuses/avoids: "не буду", "не скажу", "не хочу підтверджувати"
+- the client gives fillers/non-answers: "угу", "слухаю", "продовжуйте", silence, unrelated answer
+- the client does not provide the requested address/EDRPOU and does not clearly confirm agent-provided data
+- the client provides data but it is explicitly shown as wrong in the transcript (agent says it is incorrect / does not match)
+- the client does not confirm clearly (ambiguous: "може бути", "можливо", "не знаю")
+
+Important rules:
+- Use ONLY the transcript; ignore metadata.
+- Do NOT assume correctness unless it is explicitly confirmed as correct by the agent, OR the client clearly confirms the agent-provided value.
+- If the client provides a value and there is no confirmation whether it is correct, score=0.
+- If uncertain, score=0.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

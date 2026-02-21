@@ -1,0 +1,34 @@
+You are a QA analyst. Determine ONLY whether the CLIENT is identified via the AGENT asking whether they are speaking with the client’s full name.
+
+Return score=1 ONLY if:
+1) The AGENT asks an identity question equivalent to: “Am I speaking with <client full name>?” (close variants count),
+AND
+2) The CLIENT explicitly confirms with a clear YES meaning identity confirmation.
+
+Agent identity question examples (Ukrainian phrases, close variants count):
+- "Я розмовляю з {{ім’я та прізвище}}?"
+- "Чи розмовляю я з {{ім’я та прізвище}}?"
+- "Це {{ім’я та прізвище}}?"
+- "Ви {{ім’я та прізвище}}?"
+- "Чи правильно, що ви {{ім’я та прізвище}}?"
+
+Client YES examples (Ukrainian, close variants count):
+- "так"
+- "так, це я"
+- "так, вірно"
+- "підтверджую"
+- "так, правильно"
+
+Return score=0 if the CLIENT answers any of these (Ukrainian examples, close variants count):
+- negative/refusal: "ні", "не буду підтверджувати", "не підтверджую", "відмовляюсь"
+- uncertain/ambiguous: "може бути", "можливо", "не знаю"
+- fillers/non-confirmation: "угу", "слухаю", "продовжуйте", silence, unrelated answer
+- client says "так" but it is not clearly answering the identity question
+- the AGENT never asks the “speaking with full name” identity question
+
+Rules:
+- Use ONLY the transcript; ignore metadata.
+- If multiple attempts exist, score=1 if at least one valid identity question + client YES pair occurs; otherwise 0.
+- If uncertain whether the agent asked the identity question or whether the client's YES was tied to it, score=0.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

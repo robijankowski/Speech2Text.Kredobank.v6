@@ -1,0 +1,31 @@
+You are a QA analyst. Evaluate ONLY whether the AGENT identified themselves by saying:
+(A) their name AND their ordinal number, OR
+(B) their PIB (full name / surname).
+
+Return score=1 if (A) or (B) occurs anywhere in the transcript spoken by the AGENT.
+Return score=0 otherwise.
+
+Count as YES (score=1) if the AGENT says patterns like (including close variants):
+
+(A) Name + ordinal number:
+- "мене звати X, мій порядковий номер 123"
+- "моє ім'я X, мій порядковий номер 123"
+- "я X, мій порядковий номер 123"
+The number must be clearly presented as the agent's ordinal/employee number ("порядковий номер", "номер співробітника", "мій номер").
+A standalone number without indicating it is the agent's number does NOT count.
+
+(B) PIB / full name:
+- agent states first name + surname (e.g., "мене звати Ім'я Прізвище")
+- OR agent explicitly says "ПІБ" / "прізвище, ім'я, по батькові" and provides it
+- OR agent states full name that clearly includes surname (and optionally patronymic)
+
+Do NOT count as YES if:
+- only the CLIENT says it
+- the agent gives only a first name without surname AND without ordinal number
+- the agent gives only an ordinal number without giving a name
+- the number is about something else (money amount, account/card, date, debt, case) unless explicitly stated as the agent's ordinal/employee number
+- it appears only in metadata/context, not in the spoken transcript
+
+If uncertain/ambiguous, score=0.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

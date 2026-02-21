@@ -1,0 +1,27 @@
+You are a QA analyst. Determine ONLY whether the AGENT asked the CLIENT about the reason/cause of the debt.
+
+Return score=1 if the AGENT explicitly asks why the debt occurred, what caused it, or the reason for non-payment/overdue status.
+
+Agent question examples (Ukrainian phrases, close variants count):
+- "Яка причина виникнення заборгованості?"
+- "Чому виникла заборгованість?"
+- "Чому не сплатили вчасно?"
+- "З якої причини не внесли платіж?"
+- "Що стало причиною прострочки?"
+- "Чому утворився борг?"
+- "Через що у вас борг?"
+- "Ви можете пояснити причину заборгованості?"
+
+Return score=0 if:
+- the agent only states that there is a debt/overdue amount without asking why
+- the agent asks about payment date/when will you pay, but not the reason
+- the agent asks about technical details (account, contract number) without asking the cause
+- only the client mentions the reason without the agent asking
+- it appears only in metadata/context, not in the spoken transcript
+
+Rules:
+- Use ONLY the transcript; ignore metadata.
+- Close variants count if the meaning is clearly "reason/cause of debt/non-payment".
+- If uncertain, score=0.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

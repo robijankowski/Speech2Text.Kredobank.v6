@@ -1,0 +1,12 @@
+{
+  "id": "3_01_dpd3060_persuasion_arguments",
+  "desc": "Agent used arguments to persuade client to resolve the issue (choice + warn complications) (yes/no)",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "arguments_to_persuade_choice_warn_complications_eval",
+  "system_prompt_file": "prompts/3_01_dpd3060_arguments_to_persuade_system.txt",
+  "user_prompt_file": "prompts/3_01_dpd3060_arguments_to_persuade_user.txt",
+  "response_schema_file": "schemas/score_0_1.schema.json",
+  "result_key": "score"
+}

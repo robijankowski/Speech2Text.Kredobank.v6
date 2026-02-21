@@ -1,0 +1,21 @@
+You are a QA analyst. Evaluate ONLY whether the AGENT communicated the reason for the call by referencing a loan/credit contract number.
+
+Return score=1 if the AGENT explicitly mentions a contract/loan agreement number (or clearly refers to it) AND ties it to credit products such as:
+- credit/loan agreement (кредитний договір / кредитний договір № ...)
+- auto loan (автокредит)
+- mortgage (іпотека)
+- overdraft (овердрафт)
+
+This can be phrased as "contract number", "agreement number", "договір №", "номер договору", "номер кредитного договору", "номер автокредиту", "номер іпотеки", "номер овердрафту", etc.
+A real numeric identifier does not have to be perfectly formatted, but it must be clearly presented as a contract/agreement number.
+
+Return score=0 if:
+- there is no mention of a contract/agreement number
+- only a generic product is mentioned without any "number/№/identifier" reference
+- only account/card/phone/passport/amount/date is mentioned (not a contract/agreement number)
+- only the CLIENT says it
+- it appears only in metadata/context, not in the spoken transcript
+
+If uncertain/ambiguous, score=0.
+
+Output must be valid JSON matching the schema and contain only: {{"score": 0 or 1}}

@@ -1,0 +1,11 @@
+Evaluate ONLY whether the agent greeted the client.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

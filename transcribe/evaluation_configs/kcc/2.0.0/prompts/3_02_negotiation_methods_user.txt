@@ -1,0 +1,12 @@
+Evaluate whether the agent used negotiation methods:
+(1) "Three Yes" and/or (2) "Choice without choice".
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""
