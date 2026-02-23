@@ -15,9 +15,8 @@ from transcribe.utilities.scenario_tools import Turn, render_timestamped_script_
 from transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario, async_generate_crm_summary_for_call_scenario_ext
 # from transcribe.utilities.transcribe_mono import async_transcribe_mono_audio_file_to_scenario
 from transcribe.utilities.transcribe_mono_lr import async_transcribe_mono_timestamped_lr
-from transcribe.utilities.transcribe_mono_lr2 import async_transcribe_mono_timestamped_lr2
 from transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_timestamped_lr
-from transcribe.utilities.evaluation_interrupts_lr import analyze_turn_overlaps_lr # no async need - just calc
+from transcribe.utilities.evaluation_interrupts import analyze_turn_overlaps # no async need - just calc
 from transcribe.utilities.evaluation_engine import async_run_scheme
 
 from transcribe.utilities.evaluation_engine_regs import load_active_scheme # no async need - just calc
@@ -54,7 +53,7 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
                                                         metadata=metadata 
                                                         )
     else:
-        turns, scenario = await async_transcribe_mono_timestamped_lr2(  source_file=source_file,
+        turns, scenario = await async_transcribe_mono_timestamped_lr(  source_file=source_file,
                                                         temp_root_dir=temp_root_dir,
                                                         metadata=metadata 
                                                         )
@@ -112,7 +111,7 @@ async def async_evaluate_conversation_interrupts_pipeline(
     # )
 
     overlaps_res = await asyncio.to_thread(
-        analyze_turn_overlaps_lr,
+        analyze_turn_overlaps,
         turns,
         min_overlap_ms=450,
         eps_ms=30,

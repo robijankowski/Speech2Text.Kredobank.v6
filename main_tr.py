@@ -146,12 +146,12 @@ CALL_DATE = date(2026, 1,15)
 SYSTEM_CODE = "kcc"
 
 
-from transcribe.utilities.transcribe_pipeline import ( async_transcribe_audio_file_to_scenario_pipeline,
-                                                          async_generate_scenario_summary_pipeline,
-                                                          async_evaluate_transcripted_scenario_pipeline,
-                                                          async_run_analysis_of_the_transcription_pipeline,
-                                                          async_evaluate_conversation_interrupts_pipeline,
-                                                          )
+from transcribe.utilities.transcribe_pipeline import (async_transcribe_audio_file_to_scenario_pipeline,
+                                                      async_generate_scenario_summary_pipeline,
+                                                      async_evaluate_transcripted_scenario_pipeline,
+                                                      async_run_analysis_of_the_transcription_pipeline,
+                                                      async_evaluate_conversation_interrupts_pipeline,
+                                                      )
 
 
 async def async_run_transcription(start_index=0, end_index=None):
@@ -179,15 +179,20 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                           )
             log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
 
-            # return
+
+            
             log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
             summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
-            log.info(f"Summary for file number {audio_file} :\n{summary}")
+            log.info(f"Summary for file number {audio_file} :\n{json.dumps(summary, ensure_ascii=False, indent=2)}")
+
 
 
             log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
-            res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, file_name=audio_file) # this is not async - pure calcs.
-            log.info(f"Evaluation interrupts result {audio_file} :\n{res_interrupts}")
+            res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, 
+                                                                                   file_name=audio_file) 
+            log.info(f"Evaluation interrupts result {audio_file} :\n{json.dumps(res_interrupts, ensure_ascii=False, indent=2)}")
+
+
 
             log.info("\n\n" + "=" * 60 + f"\nRunning evaluation for file name: '{audio_file}'\n")
             res, success = await async_evaluate_transcripted_scenario_pipeline( scenario=scenario,
@@ -198,7 +203,9 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                                     prev_result=None,
                                                                     interrupts_analysis=res_interrupts
                                                                     )
-            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, indent=2)}")
+            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, ensure_ascii=False, indent=2)}")
+
+
 
             log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for  file name: '{audio_file}'\n")
             request = json.loads(SAMPLE_REQUEST_JSON) #simluation of phase 2 - analysis on free questions

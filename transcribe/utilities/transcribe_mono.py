@@ -1,16 +1,13 @@
-# transcribe/utilities/transcribe_mono.py
-
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import re
 
-from dataclasses import dataclass
+
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, BinaryIO, Union, Tuple, Iterable
+
 
 from pydub import AudioSegment
 from pydub.effects import normalize
@@ -18,417 +15,45 @@ from pydub.effects import normalize
 from core.config import settings
 from core.logger import log
 
-
-from openai_tools.openai_client_text import (
-    async_chat_completion_with_format,
-)
-
 from openai_tools.openai_client_transcribe import (
-    async_transcribe_audio,
     async_transcribe_audio_diarized,
     Transcription,
 )
 
 from transcribe.utilities.audio_tools import (
-    clean_audio_file_lr,
+    clean_audio_file,
     remove_long_silences_in_audio,
     stereo_to_mono,
 )
 
-# If you already use these in your pipeline, we reuse them to stay consistent
-from transcribe.utilities.scenario_tools import (
-    async_detect_speaker_roles, Turn, render_timestamped_script_from_turns
-)
+from transcribe.utilities.scenario_tools import (Turn, 
+                                                 DiarSeg,
+                                                 render_timestamped_script_from_turns,
+                                                 render_timestamped_script_from_diar_segs,
+                                                 add_prefix_to_sentences,
+                                                 consolidate_dialogue
+                                                 )
 
-from transcribe.utilities.transcribe_mono_tools import (
-    async_classify_all_speakers_agent_or_client
-)
-
-def _default_asr_model() -> str:
-    # normal transcription model (NOT diarize)
-    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
-
-def _default_diarize_model() -> str:
-    # diarization model
-    return settings.AZURE_MODEL_TRANSCRIBE_DIARIZE if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_DIARIZE
-
-def _default_chat_model() -> str:
-    # normal transcription model (NOT diarize)
-    return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
+from transcribe.utilities.transcribe_mono_tools import (async_split_transcription_into_roles_4o,
+                                                            async_transcript_audio_file_verbose_o4_single_channel,
+                                                            async_transcript_audio_file_verbose_o4_stereo,
+                                                            async_classify_all_speakers_agent_or_client
+                                                            )
 
 
-# --- add below your DiarizedSeg helpers in transcribe_mono.py ---
-
-REPAIR_DIARIZATION_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "segments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "start": {"type": "number"},
-                    "end": {"type": "number"},
-                    "speaker": {"type": "string"},
-                    "text": {"type": "string"},
-                },
-                "required": ["start", "end", "speaker", "text"],
-                "additionalProperties": False,
-            },
-        }
-    },
-    "required": ["segments"],
-    "additionalProperties": False,
-}
+AudioInput = Union[str, Path, BinaryIO]
 
 
-def _count_speaker_flips(segs: List[Turn]) -> int:
-    flips = 0
-    prev = None
-    for s in segs:
-        if prev is not None and s.role != prev:
-            flips += 1
-        prev = s.role
-    return flips
+
+def slice_wav111111(in_wav: str, out_wav: str, start_s: float, end_s: float, pad_ms: int = 250) -> str:
+    audio = AudioSegment.from_file(in_wav)
+    start_ms = max(0, int(start_s * 1000) - pad_ms)
+    end_ms = min(len(audio), int(end_s * 1000) + pad_ms)
+    chunk = audio[start_ms:end_ms]
+    chunk.export(out_wav, format="wav")
+    return out_wav
 
 
-def _words_count(text: str) -> int:
-    return len([w for w in (text or "").strip().split() if w])
-
-
-_BACKCHANNEL = {
-    "так", "да", "угу", "ага", "добре", "хорошо", "дякую", "спасибо",
-    "алло", "алло.", "ок", "окей", "окей.", "зрозуміло", "понятно",
-}
-
-
-def heuristic_repair_micro_flips(
-    segs: List[Turn],
-    max_short_sec: float = 0.65,
-    max_words: int = 2,
-    max_gap_sec: float = 0.40,
-) -> List[Turn]:
-    """
-    Cheap deterministic smoothing:
-      - if a very short backchannel is sandwiched between same speaker => flip it to that speaker
-      - if tiny segments cause A-B-A within small gap => collapse middle to A
-      - merges adjacent same-speaker segments if close
-    """
-    if not segs:
-        return []
-
-    segs = sorted(segs, key=lambda x: (x.start, x.end))
-
-    # 1) fix sandwiched micro segments
-    fixed: List[Turn] = []
-    for i, s in enumerate(segs):
-        dur = max(0.0, s.end - s.start)
-        wc = _words_count(s.text)
-        txt_lc = (s.text or "").strip().lower()
-
-        prev_s = segs[i - 1] if i > 0 else None
-        next_s = segs[i + 1] if i + 1 < len(segs) else None
-
-        if prev_s and next_s:
-            sandwich = (prev_s.role == next_s.role) and (s.role != prev_s.role)
-            close = (s.start - prev_s.end) <= max_gap_sec and (next_s.start - s.end) <= max_gap_sec
-            shorty = (dur <= max_short_sec and wc <= max_words) or (txt_lc in _BACKCHANNEL and dur <= 1.0)
-
-            if sandwich and close and shorty:
-                # re-assign to surrounding speaker
-                fixed.append(Turn(start=s.start, end=s.end, role=prev_s.role, text=s.text, file=s.file))
-                continue
-
-        fixed.append(s)
-
-    # 2) merge adjacent
-    merged: List[Turn] = []
-    for s in fixed:
-        if not s.text.strip():
-            continue
-        if not merged:
-            merged.append(s)
-            continue
-        last = merged[-1]
-        if s.role == last.role and (s.start - last.end) <= 0.80:
-            merged[-1] = Turn(
-                start=last.start,
-                end=max(last.end, s.end),
-                role=last.role,
-                text=(last.text + " " + s.text).strip(),
-                file=last.file
-            )
-        else:
-            merged.append(s)
-
-    return merged
-
-
-def _format_segments_for_llm(segs: List[Turn], *, max_chars: int = 12000) -> str:
-    """
-    Compact representation to keep prompt size sane.
-    """
-    lines: List[str] = []
-    for i, s in enumerate(segs):
-        lines.append(
-            f"{i:03d} | {s.start:.2f}-{s.end:.2f} | {s.role} | {s.text}"
-        )
-    txt = "\n".join(lines)
-    if len(txt) > max_chars:
-        return txt[:max_chars] + "\n...[truncated]..."
-    return txt
-
-
-def _validate_repaired_segments(
-    repaired: List[Turn],
-    *,
-    allowed_speakers: set[str],
-) -> bool:
-    """
-    Basic sanity checks: time order, non-empty text, speaker in allowed set.
-    We allow small overlaps; scenario rendering will still be OK.
-    """
-    if not repaired:
-        return False
-
-    prev_start = -1e9
-    for s in repaired:
-        if s.role not in allowed_speakers:
-            return False
-        if s.end <= s.start:
-            return False
-        if s.start < prev_start - 0.25:  # big backward jump
-            return False
-        if not (s.text or "").strip():
-            return False
-        prev_start = s.start
-    return True
-
-
-async def async_repair_diarized_segments_llm(
-    segs: List[Turn],
-    metadata: Any = None,
-    temperature: float = 0.0,
-    timeout: float = 120.0,
-    chunk_size: int = 90,
-    overlap: int = 12,
-    source_file: str = ""
-) -> List[Turn]:
-    """
-    LLM repair pass (gpt-5.2 recommended):
-      - fix micro speaker flips
-      - fix overlap artifacts where possible using context
-      - merge fragments that belong together
-    Works in chunked mode for long calls.
-    """
-    if not segs:
-        return []
-
-    segs = sorted(segs, key=lambda x: (x.start, x.end))
-    allowed_speakers = sorted({s.role for s in segs})
-
-    system = (
-        "You are repairing diarized transcript segments from a TWO-PERSON bank call.\n"
-        "Goal: fix diarization artifacts (micro speaker flips, backchannel mislabels, overlap confusion) "
-        "WITHOUT changing what was said.\n\n"
-        "STRICT RULES:\n"
-        "- DO NOT translate or normalize language. Keep Ukrainian/Russian words exactly as spoken.\n"
-        "- DO NOT invent new words.\n"
-        "- You MAY: reassign the 'speaker' of an existing segment, merge adjacent segments, "
-        "and lightly adjust boundaries ONLY if needed for consistency.\n"
-        "- Keep speakers limited to the existing labels only.\n"
-        "- Output must be valid JSON matching the schema.\n"
-    )
-    system = (
-        "You are repairing diarized transcript segments from a TWO-PERSON bank call: CLIENT and AGENT.\n"
-        "Goal: fix diarization artifacts (micro speaker flips, backchannel mislabels, overlap confusion).\n\n"
-        "STRICT RULES:\n"
-        "- DO NOT translate language. Keep Ukrainian/Russian words as originally spoken.\n"
-        "- DO NOT rewrite sentences or improve style.\n"
-        "- DO NOT add new content.\n"
-        "- You MAY ONLY change 'text' in one special case: "
-        "correct obvious ASR misspellings of the KNOWN ENTITIES listed below, "
-        "replacing them with the canonical spellings exactly.\n"
-        "- If you are not confident a token refers to a known entity, leave it unchanged.\n"
-        "- You MAY reassign 'speaker', merge adjacent segments, and lightly adjust boundaries.\n"
-        "- Keep speakers limited to the existing labels only.\n"
-        "- Output must be valid JSON matching the schema.\n\n"
-        "Known entities canonical names: {metadata}"
-    )
-
-    async def _async_call_one(chunk: List[Turn]) -> List[Turn]:
-        user = (
-            f"Speakers: {allowed_speakers}\n"
-            f"Metadata: {_to_str_metadata(metadata)}\n\n"
-            "Here are diarized segments (index | start-end | speaker | text):\n"
-            "-----\n"
-            f"{_format_segments_for_llm(chunk)}\n"
-            "-----\n\n"
-            "Return repaired segments as JSON."
-        )
-
-        print("PROMPT TO LLM:\n", system + "\n\n" + user)
-
-        model = _default_chat_model()
-        completion = await async_chat_completion_with_format(
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            model=model,
-            temperature=temperature,
-            timeout=timeout,
-            format_schema=REPAIR_DIARIZATION_SCHEMA,
-            schema_name="repair_diarization_segments",
-        )
-
-        payload = json.loads(completion.choices[0].message.content)
-        out = []
-        for r in payload.get("segments", []):
-            out.append(
-                Turn(
-                    start=float(r["start"]),
-                    end=float(r["end"]),
-                    role=str(r["speaker"]),
-                    text=str(r["text"]).strip(),
-                    file=source_file,
-                )
-            )
-        out.sort(key=lambda x: (x.start, x.end))
-        if not _validate_repaired_segments(out, allowed_speakers=set(allowed_speakers)):
-            # fallback to original chunk
-            return chunk
-        return out
-
-    # Chunked repair for long calls
-    if len(segs) <= chunk_size:
-        return await _async_call_one(segs)
-
-    repaired_all: List[Turn] = []
-    i = 0
-    while i < len(segs):
-        j = min(len(segs), i + chunk_size)
-        chunk = segs[i:j]
-        repaired_chunk = await _async_call_one(chunk)
-
-        # avoid duplicating overlap region from previous chunk
-        if repaired_all and overlap > 0:
-            # drop first N segments of chunk to reduce boundary duplication
-            repaired_chunk = repaired_chunk[overlap:] if len(repaired_chunk) > overlap else []
-
-        repaired_all.extend(repaired_chunk)
-        if j >= len(segs):
-            break
-        i = j - overlap  # overlap for context
-
-    repaired_all.sort(key=lambda x: (x.start, x.end))
-    return repaired_all
-
-
-async def async_repair_diarized_segments(
-    segs: List[Turn],
-    metadata: Any = None,
-    timeout: float = 120.0,
-    force_llm: bool = False,
-    source_file: str = "",
-) -> List[Turn]:
-    """
-    Combined repair:
-      1) heuristic smoothing (cheap)
-      2) LLM repair (gpt-5.2) when flips are still high or force_llm=True
-    """
-    if not segs:
-        return []
-
-    pre = heuristic_repair_micro_flips(segs)
-    flips_before = _count_speaker_flips(segs)
-    flips_after = _count_speaker_flips(pre)
-
-    # run LLM if still noisy
-    noisy = flips_after >= max(10, int(len(pre) * 0.18))
-    if force_llm or noisy or (flips_after > flips_before * 0.9):
-        try:
-            return await async_repair_diarized_segments_llm(pre, 
-                                                metadata=metadata, 
-                                                timeout=timeout,
-                                                source_file=source_file)
-        except Exception:
-            log.exception("LLM diarization repair failed; using heuristic-only output.")
-            return pre
-
-    return pre
-
-
-# -----------------------------
-# Prompts (aligned with your stereo prompt rules)
-# -----------------------------
-
-SINGLE_CHANNEL_UNKNOWN_ROLE_PROMPT_EN = """
-This is an isolated single-channel recording from a phone call between a KredoBank Ukraine collections AGENT and a CLIENT.
-Only ONE participant is audible in this file, but you DO NOT know whether it is the AGENT or the CLIENT.
-
-Your task: produce a verbatim transcript of the audible speaker ONLY.
-
-CRITICAL: PRESERVE THE ORIGINAL SPOKEN LANGUAGE (NO TRANSLATION)
-- Transcribe EXACTLY what is said, without translating or "correcting" language.
-- If a word is spoken in Ukrainian → write it in Ukrainian.
-- If a word is spoken in Russian → write it in Russian.
-- If speech is mixed (code-switching / surzhyk) → preserve each word in its original language.
-- NEVER replace Russian words with Ukrainian equivalents (e.g., do not change "да" to "так").
-
-SINGLE-SPEAKER RULES
-- Do NOT invent the other speaker’s lines.
-- Do NOT add placeholders like “(other speaker)” or imagined replies.
-- If the speaker repeats themselves, hesitates, or uses fillers (“ну”, “ммм”, “это”, “вот”, etc.), keep them.
-
-PUNCTUATION & STYLE
-- Add natural punctuation and capitalization suitable for spoken dialogue.
-- Keep numbers, names, dates, amounts exactly as spoken.
-- If a word is unclear, keep your best guess; if truly unintelligible, use [unclear].
-
-Context metadata to help recognition (names, bank, etc.):
-Known entities canonical names: {metadata}
-"""
-
-MONO_CALL_PROMPT_UA = """
-Це МОНО запис телефонної розмови між клієнтом та оператором KredoBank Україна (відділ стягнення заборгованості).
-
-🔸 КРИТИЧНО ВАЖЛИВО - ЗБЕРЕЖЕННЯ ОРИГІНАЛЬНОЇ МОВИ:
-- Транскрибуй ТОЧНО ТАК, ЯК СКАЗАНО, без перекладів.
-- Якщо слово українською → записуй українською
-- Якщо слово російською → записуй російською
-- Якщо змішано (суржик) → зберігай кожне слово в оригінальній мові
-- НІКОЛИ не замінюй російські слова українськими еквівалентами (не змінюй "да" на "так")
-- НІКОЛИ не "виправляй" мову
-
-📌 ВАЖЛИВО:
-- Додай природну пунктуацію для усного мовлення.
-- Зберігай слова-паразити та повтори.
-- Імена/суми/дати — як сказано.
-
-🔹 Контекстні дані (метадані):
-Known entities canonical names: {metadata}
-"""
-
-
-# -----------------------------
-# Data helpers
-# -----------------------------
-
-# @dataclass(frozen=True)
-# class Turn:
-#     start: float
-#     end: float
-#     role: str
-#     text: str
-
-
-def _to_str_metadata(metadata: Any) -> str:
-    if metadata is None:
-        return ""
-    if isinstance(metadata, str):
-        return metadata
-    try:
-        return json.dumps(metadata, ensure_ascii=False)
-    except Exception:
-        return str(metadata)
 
 
 def _as_dict(obj: Any) -> Dict[str, Any]:
@@ -445,15 +70,6 @@ def _as_dict(obj: Any) -> Dict[str, Any]:
         return vars(obj)
     except Exception:
         return {}
-
-
-# def _get_text(obj: Any) -> str:
-#     if obj is None:
-#         return ""
-#     if isinstance(obj, dict):
-#         return str(obj.get("text") or "")
-#     return str(getattr(obj, "text", "") or "")
-
 
 def _extract_segments(obj: Any) -> List[Any]:
     """
@@ -479,82 +95,7 @@ def _extract_segments(obj: Any) -> List[Any]:
     return []
 
 
-def _seg_get(seg: Any, key: str, default: Any = None) -> Any:
-    if isinstance(seg, dict):
-        return seg.get(key, default)
-    return getattr(seg, key, default)
-
-
-def parse_diarized_segments(transcription: Any, 
-                            speaker_map: Optional[Dict[str, str]] = None,
-                            source_file: str = "") -> List[Turn]:
-    segs = _extract_segments(transcription)
-    out: List[Turn] = []
-
-    # normalize mapping keys once
-    norm_map = {str(k).strip(): str(v).strip() for k, v in (speaker_map or {}).items()}
-
-    for s in segs:
-        text = (_seg_get(s, "text", "") or "").strip()
-        if not text:
-            continue
-
-        start = _seg_get(s, "start", None)
-        end = _seg_get(s, "end", None)
-        if start is None or end is None:
-            continue
-
-        speaker = (
-            _seg_get(s, "speaker", None)
-            or _seg_get(s, "speaker_id", None)
-            or _seg_get(s, "spk", None)
-            or "S0"
-        )
-
-        spk = str(speaker).strip()
-        new_spk = norm_map.get(spk, spk)
-
-        out.append(Turn(start=float(start), end=float(end), role=str(new_spk), text=text, file=source_file))
-
-    out.sort(key=lambda x: (x.start, x.end))
-    return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def group_by_speaker(segs: List[Turn]) -> Dict[str, List[Turn]]:
-    by: Dict[str, List[Turn]] = {}
-    for s in segs:
-        by.setdefault(s.role, []).append(s)
-    return by
-
-
-def speaker_total_duration(segs: List[Turn]) -> float:
-    return sum(max(0.0, s.end - s.start) for s in segs)
-
-
-def choose_top_speakers(by_speaker: Dict[str, List[Turn]], max_speakers: int = 2) -> List[str]:
-    items = [(spk, speaker_total_duration(segs)) for spk, segs in by_speaker.items()]
-    items.sort(key=lambda x: x[1], reverse=True)
-    return [spk for spk, _dur in items[:max_speakers]]
-
-
-# -----------------------------
-# Preprocessing (mono)
-# -----------------------------
-
 def prepare_audio_for_transcription_mono(
-    *,
     source_file: str,
     temp_dir: str,
     frame_rate: int = 16000,
@@ -591,477 +132,467 @@ def prepare_audio_for_transcription_mono(
         audio.export(work_path, format="wav")
 
     # Clean (normalize + NR) + remove long silences
-    cleaned = clean_audio_file_lr(work_path)
+    cleaned = clean_audio_file(work_path)
     cleaned = remove_long_silences_in_audio(cleaned)
     return cleaned
 
 
-# -----------------------------
-# Transcription steps (mono)
-# -----------------------------
-
-async def async_transcribe_mono_full(
+async def async_generate_diarize_segments(
     *,
-    mono_file_cleaned: str,
-    metadata: Any = None,
-    model: str = "",
+    wav_seg_path: str,
+    language: str = "uk",
     temperature: float = 0.0,
-    timeout: float = 120.0,
-) -> Transcription:
+    min_seg_s: float = 0.10,
+    max_seg_s: float = 300.0,
+) -> List[DiarSeg]:
     """
-    Full mono transcription (not diarized) – useful for fallback / debugging.
+    Run O4 diarize on wav_seg_path (conditioning-safe audio) to obtain diarized segments.
+    Returns cleaned segments: (start, end, text, speaker), sorted by time.
     """
-    prompt = MONO_CALL_PROMPT_UA.format(metadata=_to_str_metadata(metadata))
-    model = _default_asr_model() 
-
-    tr = await async_transcribe_audio(
-        audio=mono_file_cleaned,
-        model=model,
-        prompt=prompt,
+    res = await async_transcribe_audio_diarized(
+        audio=wav_seg_path,
+        language=language,
         temperature=temperature,
-        timeout=timeout,
-        response_format="json",
-        timestamp_granularities=["segment"],
     )
-    log.info("Mono full transcription done with model: %s", model)
-    return tr
 
+    segs = _extract_segments(res)
 
-async def async_transcribe_mono_diarized(
-    *,
-    mono_file_cleaned: str,
-    temperature: float = 0.0,
-    timeout: float = 120.0,
-    chunking_strategy: str = "auto",
-) -> Transcription:
-    """
-    Diarized mono transcription (speaker turns).
-    """
-    model = _default_diarize_model()
-    tr = await async_transcribe_audio_diarized(
-        audio=mono_file_cleaned,
-        model=model,
-        temperature=temperature,
-        timeout=timeout,
-        chunking_strategy=chunking_strategy,
-    )
-    log.info("Mono diarized transcription done with model: %s", model)
-    return tr
+    script = render_timestamped_script_from_diar_segs(segs)
+    log.info(f"\n=== O4 diarized segments ===\n{str(script)}")
 
+    def s_get(s: Any, k: str) -> Any:
+        return s.get(k) if isinstance(s, dict) else getattr(s, k, None)
 
-# -----------------------------
-# Virtual channels (optional accuracy boost)
-# -----------------------------
-
-MappingItem = Tuple[float, float, float, float]  # (concat_start, concat_end, orig_start, orig_end)
-
-
-def build_speaker_stream(
-    *,
-    mono_file_cleaned: str,
-    speaker_segments: List[Turn],
-    out_file: str,
-    keep_silence_ms: int = 300,
-    pad_ms: int = 60,
-    min_segment_sec: float = 0.25,
-) -> Tuple[str, List[MappingItem]]:
-    """
-    Concatenate only one speaker's diarization segments into a new wav.
-    Returns (out_file, mapping) where mapping converts concatenated timeline -> original timeline.
-    """
-    audio = AudioSegment.from_file(mono_file_cleaned)
-    silence = AudioSegment.silent(duration=max(0, keep_silence_ms))
-
-    cursor_s = 0.0
-    mapping: List[MappingItem] = []
-    out_audio = AudioSegment.silent(duration=0)
-
-    for seg in speaker_segments:
-        dur = seg.end - seg.start
-        if dur < min_segment_sec:
-            continue
-
-        start_ms = max(0, int(seg.start * 1000) - pad_ms)
-        end_ms = min(len(audio), int(seg.end * 1000) + pad_ms)
-        if end_ms <= start_ms:
-            continue
-
-        chunk = audio[start_ms:end_ms]
-        chunk_dur_s = len(chunk) / 1000.0
-
-        # map chunk interval
-        mapping.append((cursor_s, cursor_s + chunk_dur_s, seg.start, seg.end))
-        out_audio += chunk
-        cursor_s += chunk_dur_s
-
-        # map inserted silence to a fixed original time (end boundary)
-        if keep_silence_ms > 0:
-            sil_dur_s = keep_silence_ms / 1000.0
-            mapping.append((cursor_s, cursor_s + sil_dur_s, seg.end, seg.end))
-            out_audio += silence
-            cursor_s += sil_dur_s
-
-    out_audio = normalize(out_audio).set_frame_rate(16000).set_channels(1)
-    out_audio.export(out_file, format="wav")
-    return out_file, mapping
-
-
-def _map_time(concat_t: float, mapping: List[MappingItem]) -> float:
-    """
-    Convert time in concatenated stream into original time using piecewise linear mapping.
-    """
-    if not mapping:
-        return concat_t
-
-    # mapping is monotonic; linear scan is fine for typical segment counts
-    for c0, c1, o0, o1 in mapping:
-        if concat_t < c0:
-            return o0
-        if c0 <= concat_t <= c1:
-            if c1 <= c0:
-                return o0
-            if o1 == o0:
-                return o0
-            ratio = (concat_t - c0) / (c1 - c0)
-            return o0 + ratio * (o1 - o0)
-
-    # past the end
-    return mapping[-1][3]
-
-
-def parse_timestamped_segments(transcription: Any, 
-                               speaker_id: str,
-                               source_file: str = "") -> List[Turn]:
-    """
-    Parse timestamped segments from non-diarized ASR output (json with segment timestamps).
-    Speaker label is forced to speaker_id.
-    """
-    segs = _extract_segments(transcription)
-    out: List[Turn] = []
+    cleaned: List[DiarSeg] = []
     for s in segs:
-        text = (_seg_get(s, "text", "") or "").strip()
-        if not text:
+        st = s_get(s, "start")
+        en = s_get(s, "end")
+        txt = (s_get(s, "text") or "").strip()
+        spk = (
+            s_get(s, "speaker")
+            or s_get(s, "speaker_id")
+            or s_get(s, "spk")
+            or "S0"
+        )
+        spk = str(spk).strip() if spk is not None else "S0"
+
+        if st is None or en is None:
             continue
-        start = _seg_get(s, "start", None)
-        end = _seg_get(s, "end", None)
-        if start is None or end is None:
+        st_f = float(st)
+        en_f = float(en)
+        if en_f <= st_f:
             continue
-        out.append(Turn(start=float(start), end=float(end), role=speaker_id, text=text, file=source_file))
-    out.sort(key=lambda x: (x.start, x.end))
-    return out
+
+        dur = en_f - st_f
+        if dur < min_seg_s or dur > max_seg_s:
+            continue
+        
+        # don't drop empty text segments.
+        # if not txt:
+        #     continue
+
+        cleaned.append((st_f, en_f, txt, spk))
+
+    cleaned.sort(key=lambda x: (x[0], x[1]))
+    return cleaned
 
 
-async def async_transcribe_speaker_stream(
-    *,
-    speaker_wav: str,
-    metadata: Any = None,
-    temperature: float = 0.0,
-    timeout: float = 120.0,
-) -> Transcription:
-    """
-    Single-speaker ASR on the concatenated stream.
-    """
-    prompt = SINGLE_CHANNEL_UNKNOWN_ROLE_PROMPT_EN.format(metadata=_to_str_metadata(metadata))
-    
-    model = _default_asr_model()
-    tr = await async_transcribe_audio(
-        audio=speaker_wav,
-        model=model,
-        prompt=prompt,
-        temperature=temperature,
-        timeout=timeout,
-        response_format="json",
-        timestamp_granularities=["segment"],
-    )
-    return tr
-
-
-async def async_enhance_segments_with_virtual_channels(
-    mono_file_cleaned: str,
-    diarized_segments: List[Turn],
-    temp_dir: str,
-    metadata: Any = None,
-    model: str = "",
-    keep_silence_ms: int = 300,
+def build_turns_from_diarize_segments(
+    cleaned_diar_segs: List[DiarSeg],
+    wav_path: str,
+    join_gap_s: float = 0.65,
+    hard_break_gap_s: float = 1.10,
+    break_on_punct: bool = False,
+    min_phrase_s: float = 0.30,
+    max_phrase_s: float = 15.0,
 ) -> List[Turn]:
     """
-    Optional accuracy boost:
-      1) Use diarization to isolate each speaker stream
-      2) Re-transcribe each stream with single-speaker prompt
-      3) Map segments back to original timeline
-      4) Merge into one timeline
+    Merge cleaned diarized segments into phrase-level Turns.
+    - Break on speaker change (keeps role meaningful)
+    - Break on hard gaps
+    - Optionally break on strong punctuation
+    - Join close segments
+    - Enforce max_phrase_s without duplicating a segment
     """
-    by = group_by_speaker(diarized_segments)
-    top = choose_top_speakers(by, max_speakers=2)
-    if len(top) < 2:
-        return diarized_segments  # nothing to enhance
+    if not cleaned_diar_segs:
+        return []
 
-    enhanced: List[Turn] = []
+    STRONG_PUNCT = {".", "!", "?", "…"}
 
-    base = Path(mono_file_cleaned)
-    for spk in top:
-        out_wav = str(base.with_suffix("").as_posix()) + f"_{spk}_stream.wav"
-        out_wav = str(Path(temp_dir) / Path(out_wav).name)
+    def ends_with_strong_punct(text: str) -> bool:
+        t = (text or "").strip()
+        return bool(t) and t[-1] in STRONG_PUNCT
 
-        speaker_wav, mapping = build_speaker_stream(
-            mono_file_cleaned=mono_file_cleaned,
-            speaker_segments=by[spk],
-            out_file=out_wav,
-            keep_silence_ms=keep_silence_ms,
-        )
+    turns: List[Turn] = []
 
-        tr = await async_transcribe_speaker_stream(
-            speaker_wav=speaker_wav,
-            metadata=metadata,
-        )
-        spk_segs = parse_timestamped_segments(tr, speaker_id=spk, source_file=mono_file_cleaned)
+    cur_st, cur_en, cur_txt, cur_spk = cleaned_diar_segs[0]
+    cur_parts: List[str] = [cur_txt]
+    cur_last_txt: str = cur_txt
 
-        # remap times back to original timeline
-        for s in spk_segs:
-            enhanced.append(
+    def flush():
+        phrase_text = " ".join(p for p in cur_parts if p).strip()
+        if phrase_text and (cur_en - cur_st) >= min_phrase_s:
+            turns.append(
                 Turn(
-                    start=_map_time(s.start, mapping),
-                    end=_map_time(s.end, mapping),
-                    role=spk,
-                    text=s.text,
-                    file=mono_file_cleaned
+                    role=cur_spk,
+                    start=cur_st,
+                    end=cur_en,
+                    text=phrase_text,         # diar text (cheap transcript)
+                    text_diar=phrase_text,
+                    file=wav_path,
                 )
             )
 
-    # Add any “extra” diarization speakers back using original diarized text
-    for spk, segs in by.items():
-        if spk not in top:
-            enhanced.extend(segs)
+    for st, en, txt, spk in cleaned_diar_segs[1:]:
+        gap = st - cur_en
 
-    if not enhanced:
-        return diarized_segments  # ✅ fallback safety
-
-    enhanced.sort(key=lambda x: (x.start, x.end))
-    return enhanced
-
-
-# -----------------------------
-# Role mapping + scenario formatting
-# -----------------------------
-
-def _normalize_ws(s: str) -> str:
-    return " ".join((s or "").split())
-
-
-async def async_map_speaker_ids_to_roles(
-    *,
-    diarized_segments: List[Turn],
-) -> Dict[str, str]:
-    """
-    Uses your existing detect_speaker_roles() heuristic/LLM to decide which speaker is AG vs CL,
-    based on concatenated text blocks per speaker.
-    Returns mapping like {"S0": "AG", "S1": "CL"}.
-    """
-    by = group_by_speaker(diarized_segments)
-    speakers = choose_top_speakers(by, max_speakers=2)
-    if not speakers:
-        return {}
-
-    if len(speakers) == 1:
-        # single-speaker edge case: guess AG if it looks like scripted agent talk
-        txt = " ".join(s.text for s in by[speakers[0]])
-        agentish = any(k in txt.lower() for k in ["мене звати", "меня зовут", "розмова записується", "разговор записывается", "кредобанк", "kredobank"])
-        return {speakers[0]: "AG" if agentish else "CL"}
-
-    s0, s1 = speakers[0], speakers[1]
-    t0 = " ".join(s.text for s in by[s0])
-    t1 = " ".join(s.text for s in by[s1])
-
-    agent_text, client_text = await async_detect_speaker_roles(t0, t1)
-
-    # detect_speaker_roles usually returns one of inputs (or near-identical).
-    # We map by best whitespace-normalized containment.
-    n0 = _normalize_ws(t0)
-    n1 = _normalize_ws(t1)
-    na = _normalize_ws(agent_text)
-
-    if na and (na in n0 or n0 in na):
-        return {s0: "AG", s1: "CL"}
-    if na and (na in n1 or n1 in na):
-        return {s1: "AG", s0: "CL"}
-
-    # fallback: agent text longer often indicates scripted agent (not always true, but ok fallback)
-    return {s0: "AG", s1: "CL"} if len(t0) >= len(t1) else {s1: "AG", s0: "CL"}
-
-
-def render_scenario_from_diarized(
-    *,
-    diarized_segments: List[Turn],
-    speaker_to_role: Dict[str, str],
-    merge_gap_sec: float = 0.8,
-) -> str:
-    """
-    Turns diarized segments into final scenario:
-      AG: ...
-      CL: ...
-    Merges consecutive same-role segments if close in time.
-    """
-    if not diarized_segments:
-        return ""
-
-    lines: List[Tuple[str, float, float, str]] = []  # (role, start, end, text)
-
-    for s in diarized_segments:
-        role = speaker_to_role.get(s.role, "CL")  # default CL for extras
-        lines.append((role, s.start, s.end, s.text.strip()))
-
-    # merge adjacent
-    merged: List[Tuple[str, float, float, str]] = []
-    for role, st, en, text in lines:
-        if not text:
-            continue
-        if not merged:
-            merged.append((role, st, en, text))
+        # speaker change -> flush, start new
+        if spk != cur_spk:
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
             continue
 
-        last_role, last_st, last_en, last_text = merged[-1]
-        if role == last_role and (st - last_en) <= merge_gap_sec:
-            merged[-1] = (last_role, last_st, max(last_en, en), (last_text + " " + text).strip())
+        # hard break gap
+        if gap >= hard_break_gap_s:
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
+            continue
+
+        # optional punctuation break
+        if break_on_punct and ends_with_strong_punct(cur_last_txt):
+            flush()
+            cur_st, cur_en, cur_spk = st, en, spk
+            cur_parts = [txt]
+            cur_last_txt = txt
+            continue
+
+        # join if close enough
+        if gap <= join_gap_s:
+            prospective_end = max(cur_en, en)
+
+            # cap BEFORE adding -> avoids duplicating current segment in two phrases
+            if (prospective_end - cur_st) >= max_phrase_s:
+                flush()
+                cur_st, cur_en, cur_spk = st, en, spk
+                cur_parts = [txt]
+                cur_last_txt = txt
+                continue
+
+            cur_en = prospective_end
+            cur_parts.append(txt)
+            cur_last_txt = txt
+            continue
+
+        # otherwise new phrase
+        flush()
+        cur_st, cur_en, cur_spk = st, en, spk
+        cur_parts = [txt]
+        cur_last_txt = txt
+
+    # final flush
+    flush()
+
+    return turns
+
+
+
+def extend_chunk_ends_turns11111111(
+    turns: List[Turn],
+    extend_s: float = 4.0,
+    pad_s: float = 0.25,      # same pad you use in slice_wav (converted from ms)
+    safety_s: float = 0.5,    # your "-0.5 sec"
+    max_total_s: Optional[float] = None,  # e.g., wav duration, if available
+) -> List[Turn]:
+    """
+    Populate start_ext/end_ext for each Turn:
+      - start_ext = start (unchanged)
+      - end_ext   = min(end + extend_s, next_start - pad_s - safety_s, max_total_s)
+
+    Tight timestamps remain in start/end. Extended timestamps are for slicing only.
+    Guaranteed non-overlap with next chunk's padded region.
+    """
+    if not turns:
+        return []
+
+    turns_sorted = sorted(turns, key=lambda t: (t.start, t.end))
+
+    out: List[Turn] = []
+    n = len(turns_sorted)
+
+    for i, t in enumerate(turns_sorted):
+        st = t.start
+        en = t.end
+
+        # Default: extend by extend_s
+        target_end_ext = en + extend_s
+
+        # Cap by next chunk start (if exists)
+        if i + 1 < n:
+            next_start = turns_sorted[i + 1].start
+            cap = next_start - pad_s - safety_s
+            if cap > en:
+                target_end_ext = min(target_end_ext, cap)
+            else:
+                target_end_ext = en  # cannot extend safely
+
+        # Optional cap by total duration
+        if max_total_s is not None:
+            target_end_ext = min(target_end_ext, max_total_s)
+
+        # start_ext stays tight start (this function extends only end)
+        start_ext = st
+        end_ext = target_end_ext
+
+        out.append(
+            Turn(
+                role=t.role,
+                start=st,
+                end=en,
+                text=t.text,
+                text_diar=t.text_diar,
+                file=t.file,
+                start_ext=start_ext,
+                end_ext=end_ext,
+            )
+        )
+
+    return out
+
+
+
+
+def remap_diar_speakers(
+    segs: List[DiarSeg],
+    speaker_map: Dict[str, str],
+    default_keep: bool = True,
+    normalize: bool = True,
+) -> List[DiarSeg]:
+    """
+    Remap speaker labels in diar segments using mapping like {"A":"AG","B":"CL"}.
+
+    - If default_keep=True, unknown speakers are kept as-is.
+      If default_keep=False, unknown speakers become "UNK".
+    - normalize=True applies .strip().upper() before mapping.
+    """
+    out: List[DiarSeg] = []
+    for st, en, txt, spk in (segs or []):
+        key = spk
+        if normalize and isinstance(key, str):
+            key = key.strip().upper()
+
+        new_spk = speaker_map.get(key)
+        if new_spk is None:
+            new_spk = spk if default_keep else "UNK"
+
+        out.append((st, en, txt, new_spk))
+    return out
+
+
+
+
+
+def export_role_audio_from_turns_mono(
+    mono_cleaned_path: str,
+    turns: Iterable[Turn],
+    out_dir: Optional[str] = None,
+    # Silence between concatenated slices (requested 1–2s)
+    silence_between_ms: int = 1000,
+    # Small padding around each slice to avoid hard cuts
+    pad_ms: int = 120,
+    # Use extended bounds for slicing if available (recommended when you use extend_chunk_ends_turns)
+    prefer_ext_bounds: bool = True,
+    # Keep output naming consistent with audio_tools: _lc.wav and _rc.wav :contentReference[oaicite:3]{index=3}
+    ag_suffix: str = "AG",
+    cl_suffix: str = "CL",
+    # Ensure ASR-friendly settings
+    frame_rate: int = 16000,
+    normalize_output: bool = False,
+) -> Tuple[str, str]:
+    """
+    Build two audio files from mono_cleaned by concatenating slices for each role:
+      - AGENT -> <base>_lc.wav
+      - CLIENT -> <base>_rc.wav
+
+    Slices are taken from mono_cleaned with (optional) pad_ms on both ends,
+    and separated by 1–2 seconds of inserted silence (configurable).
+    """
+
+    audio = AudioSegment.from_file(mono_cleaned_path)
+    # Ensure mono + desired frame rate
+    audio = audio.set_channels(1).set_frame_rate(frame_rate)
+
+    turns_sorted = sorted(list(turns or []), key=lambda t: (float(t.start), float(t.end)))
+    if not turns_sorted:
+        raise ValueError("No turns provided")
+
+    def _pick_bounds(t: Turn) -> Tuple[float, float]:
+        # st = float(t.start_ext if (prefer_ext_bounds and getattr(t, "start_ext", None) is not None) else t.start)
+        # en = float(t.end_ext if (prefer_ext_bounds and getattr(t, "end_ext", None) is not None) else t.end)
+        st = float(t.start)
+        en = float(t.end)
+        if en < st:
+            st, en = st, st
+        return st, en
+
+    def _slice_ms(st_s: float, en_s: float) -> AudioSegment:
+        # st_ms = max(0, int(round(st_s * 1000)) - pad_ms)
+        st_ms = max(0, int(round(st_s * 1000)))
+        en_ms = min(len(audio), int(round(en_s * 1000)) + pad_ms)
+        if en_ms <= st_ms:
+            return AudioSegment.silent(duration=0, frame_rate=frame_rate)
+        return audio[st_ms:en_ms]
+
+    # Split turns into two streams
+    ag_parts: list[AudioSegment] = []
+    cl_parts: list[AudioSegment] = []
+
+    for t in turns_sorted:
+        role = (t.role or "").strip().upper()
+        st_s, en_s = _pick_bounds(t)
+        piece = _slice_ms(st_s, en_s)
+        if len(piece) == 0:
+            continue
+
+        if role == "AGENT":
+            ag_parts.append(piece)
+        elif role == "CLIENT":
+            cl_parts.append(piece)
         else:
-            merged.append((role, st, en, text))
-
-    # final formatting
-    out_lines = [f"{role}: {txt}" for role, _st, _en, txt in merged]
-    return "\n".join(out_lines)
-
-
-
-def consolidate_consecutive_roles_text(
-    scenario: str,
-    *,
-    roles: List[str] = ["AG", "CL"],
-    join_with: str = " ",
-) -> str:
-    """
-    Consolidate consecutive lines with the same role prefix.
-    Input lines must look like: 'AG: ...' or 'CL: ...'
-
-    Example:
-      AG: a
-      AG: b
-      CL: c
-    -> AG: a b
-       CL: c
-    """
-    if not scenario or not scenario.strip():
-        return ""
-
-    role_set = set(r.strip().upper() for r in roles)
-    lines = [ln.strip() for ln in scenario.splitlines() if ln.strip()]
-
-    out: List[str] = []
-    cur_role = None
-    cur_text_parts: List[str] = []
-
-    for ln in lines:
-        m = re.match(r"^([A-Za-z]+)\s*:\s*(.*)$", ln)
-        if not m:
-            # if line doesn't match role format, flush current and keep raw
-            if cur_role is not None:
-                out.append(f"{cur_role}: {join_with.join(cur_text_parts).strip()}")
-                cur_role, cur_text_parts = None, []
-            out.append(ln)
+            # If you still have raw diar speaker labels here, you can decide where they go.
+            # For now: ignore unknown roles.
             continue
 
-        role = m.group(1).upper().strip()
-        text = (m.group(2) or "").strip()
+    if not ag_parts and not cl_parts:
+        raise ValueError("No AG/CL turns found in provided turns list")
 
-        if role not in role_set:
-            # unknown role -> flush previous, keep as-is
-            if cur_role is not None:
-                out.append(f"{cur_role}: {join_with.join(cur_text_parts).strip()}")
-                cur_role, cur_text_parts = None, []
-            out.append(ln)
-            continue
+    def _concat_with_silence(parts: list[AudioSegment]) -> AudioSegment:
+        out = AudioSegment.silent(duration=0, frame_rate=frame_rate)
+        for i, p in enumerate(parts):
+            out += p
+            if i < len(parts) - 1:
+                gap = silence_between_ms
+                out += AudioSegment.silent(duration=gap, frame_rate=frame_rate)
+        return out
 
-        if cur_role is None:
-            cur_role = role
-            cur_text_parts = [text] if text else []
-            continue
+    ag_audio = _concat_with_silence(ag_parts)
+    cl_audio = _concat_with_silence(cl_parts)
 
-        if role == cur_role:
-            if text:
-                cur_text_parts.append(text)
-        else:
-            out.append(f"{cur_role}: {join_with.join(cur_text_parts).strip()}")
-            cur_role = role
-            cur_text_parts = [text] if text else []
+    if normalize_output:
+        # Optional; mono_cleaned is usually already normalized/cleaned, so default is False.
+        if len(ag_audio) > 0:
+            ag_audio = normalize(ag_audio)
+        if len(cl_audio) > 0:
+            cl_audio = normalize(cl_audio)
 
-    if cur_role is not None:
-        out.append(f"{cur_role}: {join_with.join(cur_text_parts).strip()}")
+    # Output paths: keep convention consistent with audio_tools.py :contentReference[oaicite:4]{index=4}
+    base_no_ext = os.path.splitext(mono_cleaned_path)[0]
+    out_dir = out_dir or os.path.dirname(mono_cleaned_path) or "."
+    os.makedirs(out_dir, exist_ok=True)
 
-    return "\n".join(out)
+    ag_out = os.path.join(out_dir, f"{os.path.basename(base_no_ext)}_{ag_suffix}.wav")
+    cl_out = os.path.join(out_dir, f"{os.path.basename(base_no_ext)}_{cl_suffix}.wav")
+
+    ag_audio.export(ag_out, format="wav")
+    cl_audio.export(cl_out, format="wav")
+
+    log.info(f"Exported AG concatenated audio: {ag_out} (parts={len(ag_parts)})")
+    log.info(f"Exported CL concatenated audio: {cl_out} (parts={len(cl_parts)})")
+
+    return ag_out, cl_out
 
 
-# -----------------------------
-# Main wrapper: MONO -> scenario
-# -----------------------------
 
 async def async_transcribe_mono_audio_file_to_scenario(
-    *,
     source_file: str,
-    temp_root_dir: str,
+    temp_root_dir: Optional[str] = None,
+    language: str = "uk",
     metadata: Any = None,
-    temperature: float = 0.0,
-    timeout: float = 120.0,
-    enhance_with_virtual_channels: bool = True,
-    keep_silence_ms: int = 300,
-    repair_with_llm: bool = True,
+    chunk_pad_ms: int = 200,
+    min_seg_s: float = 0.2,
 ) -> Tuple[List[Turn], str]:
-    """
-    End-to-end MONO pipeline:
-      preprocess -> diarized transcription -> (optional refine) -> role map -> scenario
-    """
-    mono_cleaned = prepare_audio_for_transcription_mono(source_file=source_file, temp_dir=temp_root_dir)
 
-    diar = await async_transcribe_mono_diarized(
-        mono_file_cleaned=mono_cleaned,
-        temperature=temperature,
-        timeout=timeout,
+    turns, mono_cleaned_file = await async_transcribe_mono_audio_file_to_segments( source_file=source_file,
+                                                                                  temp_root_dir=temp_root_dir,
+                                                                                  language=language,
+                                                                                  metadata=metadata,
+                                                                                  chunk_pad_ms=chunk_pad_ms,
+                                                                                  min_seg_s=min_seg_s)
+
+    info_diar_segs = render_timestamped_script_from_turns(turns, timestamp_on=False)
+    log.info(f"\n\n=== Parsed remapped turns ===\n{info_diar_segs}")
+
+    ag_wav_file, cl_wav_file = export_role_audio_from_turns_mono(   mono_cleaned_path=mono_cleaned_file,
+                                                                    turns=turns)
+
+    log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned AGENT virtual channel wav " + "="*30)
+    o4_ag_trans = await async_transcript_audio_file_verbose_o4_single_channel(ag_wav_file, metadata)
+    log.info(f"\n{o4_ag_trans.text}")
+
+    log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned CLIENT virtual channel wav as " + "="*30)
+    o4_cl_trans = await async_transcript_audio_file_verbose_o4_single_channel(cl_wav_file, metadata)
+    log.info(f"\n{o4_cl_trans.text}")
+
+    log.info("\n\n" + "="*30 + f" Transcribe O4 cleaned mono wav " + "="*30)
+    o4_mono_trans = await async_transcript_audio_file_verbose_o4_stereo(mono_cleaned_file, metadata)
+    log.info(f"\n{o4_mono_trans.text}")
+    
+
+    agent_text = add_prefix_to_sentences(o4_ag_trans.text, "AG:")
+    client_text = add_prefix_to_sentences(o4_cl_trans.text, "CL:")
+
+    log.info("\n\n" + "="*30 + " Modified AGENT for o4 " + "="*30 + "\n" + agent_text.replace("AG:", "\nAG:"))
+    log.info("\n\n" + "="*30 + " Modified CLIENT for o4 " + "="*30 + "\n" + client_text.replace("CL:", "\nCL:"))
+
+    
+    log.info("\n\n\n" + "="*30 + " Generating roles/scenario with LLM " + "="*30)
+    scenario_granular = await async_split_transcription_into_roles_4o( agent_text = agent_text, 
+                                                            client_text = client_text, 
+                                                            stereo_text = o4_mono_trans.text )
+    scenario = consolidate_dialogue(scenario_granular)
+    log.info("\n" + "="*30 + " Consolidated scenario for mono file "  + "="*30 + "\n" + scenario)
+
+    return turns, scenario
+
+
+
+
+
+async def async_transcribe_mono_audio_file_to_segments(
+    source_file: str,
+    temp_root_dir: Optional[str] = None,
+    language: str = "uk",
+    metadata: Any = None,
+    chunk_pad_ms: int = 200,
+    min_seg_s: float = 0.2,
+) -> List[Turn]:
+    if not temp_root_dir:
+        temp_root_dir = settings.TR_TEMP_ROOT_DIR
+
+    mono_cleaned_file = prepare_audio_for_transcription_mono(source_file=source_file, temp_dir=temp_root_dir)
+
+    cleaned_segs = await async_generate_diarize_segments(
+        wav_seg_path=mono_cleaned_file,
+        language=language,
+        temperature=0.0,
+        min_seg_s=min_seg_s,
     )
 
-    # log.info("\n\nDiarization result:", diar)
+    speaker_map = await async_classify_all_speakers_agent_or_client(cleaned_segs)
+    log.info(f"\n\nRole mapping for mono file\n{speaker_map}")
+    cleaned_segs_remapped = remap_diar_speakers(cleaned_segs, speaker_map)
 
-    speaker_map = await async_classify_all_speakers_agent_or_client(diar)
-    log.info(f"\n\nRole mapping: {speaker_map}")
+    turns = build_turns_from_diarize_segments(
+        cleaned_diar_segs=cleaned_segs_remapped,
+        wav_path=mono_cleaned_file,          
+        join_gap_s=0.65,
+        hard_break_gap_s=1.10,
+        break_on_punct=False,
+        min_phrase_s=0.30,
+        max_phrase_s=15.0,
+    )
 
-    diar_segs = parse_diarized_segments(diar, speaker_map=speaker_map)
-    info_diar_segs = render_timestamped_script_from_turns(diar_segs)
-    log.info(f"\n\nParsed diarized segments: {info_diar_segs}")
-
-    if enhance_with_virtual_channels:
-        diar_segs = await async_enhance_segments_with_virtual_channels(
-            mono_file_cleaned=mono_cleaned,
-            diarized_segments=diar_segs,
-            temp_dir=temp_root_dir,
-            metadata=metadata,
-            keep_silence_ms=keep_silence_ms,
-        )
-        print("Enhanced diarized segments with virtual channels:", diar_segs)   
-
-    if repair_with_llm:
-        diar_segs = await async_repair_diarized_segments(
-            diar_segs,
-            metadata=metadata,
-            timeout=timeout,
-            source_file=mono_cleaned
-        )
-        print("Repaired diarized segments with LLM:", diar_segs)
-
-    # spk_map = map_speaker_ids_to_roles(diarized_segments=diar_segs)
-    # print("Final speaker to role map:", spk_map)
-    spk_map = {'AGENT': 'AG', 'CLIENT': 'CL'}
-    log.info(f"Final speaker to role map: {spk_map}")
-    scenario = render_scenario_from_diarized(diarized_segments=diar_segs, speaker_to_role=spk_map)
-    scenario = consolidate_consecutive_roles_text(scenario)
-    return diar_segs, scenario
-
-
-
-
-
+    return turns, mono_cleaned_file

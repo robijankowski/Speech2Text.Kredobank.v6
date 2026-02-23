@@ -132,8 +132,8 @@ def split_stereo_to_lr_and_clean(stereo_file_path):
     
     # Create output file names
     base_name = os.path.splitext(stereo_file_path)[0]
-    left_file = f"{base_name}_lc.wav"
-    right_file = f"{base_name}_rc.wav"
+    left_file = f"{base_name}_lch.wav"
+    right_file = f"{base_name}_rch.wav"
 
     # Export mono files
     left_channel.export(left_file, format="wav")
@@ -207,8 +207,8 @@ def split_stereo_to_lr_and_clean_lr(stereo_file_path: str):
     log.info(f"Applied crosstalk suppression to left abd right channels: {stereo_file_path}")
 
     base_name = os.path.splitext(stereo_file_path)[0]
-    left_file = f"{base_name}_lc.wav"
-    right_file = f"{base_name}_rc.wav"
+    left_file = f"{base_name}_lch.wav"
+    right_file = f"{base_name}_rch.wav"
 
     left.export(left_file, format="wav")
     right.export(right_file, format="wav")
@@ -240,7 +240,7 @@ def clean_audio_file(input_file) -> str:
 
     # Create output filename
     base_name = os.path.splitext(input_file)[0]
-    output_file = f"{base_name}_oc.wav"
+    output_file = f"{base_name}_orgch.wav"
 
     audio.export(output_file, format="wav")
     
@@ -268,7 +268,7 @@ def clean_audio_file_lr(input_file: str) -> str:
         )
 
     base_name = os.path.splitext(input_file)[0]
-    output_file = f"{base_name}_oc.wav"
+    output_file = f"{base_name}_orgch.wav"
     audio.export(output_file, format="wav")
     log.info(f"Audio mono processed for ASR: {output_file}")
 

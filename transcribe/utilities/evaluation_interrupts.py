@@ -1,44 +1,32 @@
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
+from transcribe.utilities.scenario_tools import Turn
 
-from core.config import settings
-from openai_tools.openai_client_transcribe import async_transcribe_audio_diarized
-
-from transcribe.utilities.audio_tools import clean_audio_file
-from transcribe.utilities.scenario_tools import async_classify_agent_or_client_prefix
-
-
-# ----------------------------
-# utils
-# ----------------------------
-def fmt_ts(seconds: float) -> str:
-    if seconds is None:
-        return "??:??.??"
-    m, s = divmod(float(seconds), 60.0)
-    return f"{int(m):02d}:{s:05.2f}"
 
 
 def _word_count(text: str) -> int:
     return len([w for w in (text or "").strip().split() if w])
 
 
-def format_segments(segs: List[Dict[str, Any]], label: str = "") -> str:
-    lines = [""]
-    for i, s in enumerate(segs, 1):
-        lines.append(f"Speaker: {s['text']}")
-    return "\n".join(lines)
-
-def format_segments_2print(segs: List[Dict[str, Any]], label: str = "") -> str:
-    lines = [""]
-    for i, s in enumerate(segs, 1):
-        lines.append(f"[{i:04d}] {label} {fmt_ts(s['start'])}–{fmt_ts(s['end'])}: {s['text']}")
-    return "\n".join(lines)
-
-
+def _turns_to_segs(turns: List[Turn], role: str) -> List[Dict[str, Any]]:
+    """
+    Zamiana Turn -> segment dict zgodny z evaluation_interrupts.py:
+      {"start":..., "end":..., "text":...}
+    """
+    out: List[Dict[str, Any]] = []
+    role_norm = role.strip().upper()
+    for t in turns:
+        if (t.role or "").strip().upper() != role_norm:
+            continue
+        st = float(t.start)
+        en = float(t.end)
+        txt = (t.text or "").strip()
+        if en > st and txt:
+            out.append({"start": st, "end": en, "text": txt})
+    out.sort(key=lambda x: (x["start"], x["end"]))
+    return out
 
 
 def merge_close_segments(
@@ -48,17 +36,8 @@ def merge_close_segments(
     join_with: str = " ",
 ) -> List[Dict[str, Any]]:
     """
-    Merge consecutive segments (already from the SAME group/speaker list) if the time gap between
-    them is <= gap_ms. Keeps speaker label from the first segment and updates timestamps.
-
-    Expected input: list sorted by start time.
-    Output: new list (sorted), merged where applicable.
-
-    Rules:
-      - If next.start - curr.end <= gap_ms => merge
-      - start = curr.start
-      - end   = next.end
-      - text  = curr.text + join_with + next.text
+    Sklej segmenty TEJ SAMEJ roli jeśli przerwa <= gap_ms.
+    To jest ta sama logika co w evaluation_interrupts.py. :contentReference[oaicite:3]{index=3}
     """
     if not segs:
         return []
@@ -71,26 +50,19 @@ def merge_close_segments(
 
     for nxt in segs_sorted[1:]:
         nxt = dict(nxt)
-
-        # normalize
-        cur_start = float(cur["start"])
         cur_end = float(cur["end"])
         nxt_start = float(nxt["start"])
-        nxt_end = float(nxt["end"])
-
         gap = nxt_start - cur_end
 
         if gap <= gap_sec:
-            # merge
-            cur["end"] = max(cur_end, nxt_end)
-            cur_text = str(cur.get("text", "") or "").strip()
-            nxt_text = str(nxt.get("text", "") or "").strip()
+            cur["end"] = max(cur_end, float(nxt["end"]))
+            cur_txt = str(cur.get("text", "") or "").strip()
+            nxt_txt = str(nxt.get("text", "") or "").strip()
 
-            if cur_text and nxt_text:
-                cur["text"] = f"{cur_text}{join_with}{nxt_text}"
-            elif nxt_text:
-                cur["text"] = nxt_text  # current empty, next has text
-            # speaker stays as-is
+            if cur_txt and nxt_txt:
+                cur["text"] = f"{cur_txt}{join_with}{nxt_txt}"
+            elif nxt_txt:
+                cur["text"] = nxt_txt
         else:
             merged.append(cur)
             cur = nxt
@@ -99,186 +71,101 @@ def merge_close_segments(
     return merged
 
 
-def merged_dialogue_text(
-    agent_segs: List[Dict[str, Any]],
-    client_segs: List[Dict[str, Any]],
-    *,
-    agent_label: str = "AG",
-    client_label: str = "CL",
-    include_timestamps: bool = True,
-) -> str:
-    """
-    Merge two segment lists into one time-ordered dialogue string.
-    Example:
-      AG: ...
-      CL: ...
-    """
-    items: List[Dict[str, Any]] = []
-    for s in agent_segs:
-        items.append({"start": float(s["start"]), "end": float(s["end"]), "text": s["text"], "label": agent_label})
-    for s in client_segs:
-        items.append({"start": float(s["start"]), "end": float(s["end"]), "text": s["text"], "label": client_label})
-
-    items.sort(key=lambda x: (x["start"], x["end"]))
-
-    lines: List[str] = []
-    for it in items:
-        txt = str(it["text"]).strip()
-        if not txt:
-            continue
-        if include_timestamps:
-            lines.append(f"{it['label']} {fmt_ts(it['start'])}–{fmt_ts(it['end'])}: {txt}")
-        else:
-            lines.append(f"{it['label']}: {txt}")
-    return "\n".join(lines)
 
 
-# ----------------------------
-# diarized transcription
-# ----------------------------
-async def async_transcript_audio_file_verbose_o4_diarize(
-    file_name: str,
-    temperature: float = 0.0,
-    chunking_strategy: str = "auto",
-) -> List[Dict[str, Any]]:
-    """
-    Uses gpt-4o-transcribe-diarize (or whatever is in settings.OPENAI_MODEL_TRANSCRIBE_DIARIZE).
-    Returns LIST of diarized segments with fields: speaker, start, end, text (and possibly more).
-    """
+def detect_any_overlaps_turns(
+    ag_segs: List[Dict[str, Any]],
+    cl_segs: List[Dict[str, Any]],
 
-    def _get(obj, key, default=None):
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-        return getattr(obj, key, default)
-
-    # with open(file_name, "rb") as audio_file:
-    #     transcript = openai_client.audio.transcriptions.create(
-    #         file=audio_file,
-    #         model=model,
-    #         response_format="diarized_json",
-    #         temperature=temperature,
-    #         chunking_strategy=chunking_strategy,
-    #     )
-
-    transcript = await async_transcribe_audio_diarized(
-        audio=file_name,
-        temperature=temperature,
-        chunking_strategy=chunking_strategy
-    )
-
-    segments = _get(transcript, "segments", []) or []
-    speakers = sorted({(_get(s, "speaker", "unknown")) for s in segments})
-    print(f"Segments: {len(segments)} | Speakers: {speakers}")
-
-    # Normalize each segment to plain dict
-    out: List[Dict[str, Any]] = []
-    for s in segments:
-        if isinstance(s, dict):
-            sp = s.get("speaker", "unknown")
-            st = float(s.get("start", 0.0))
-            en = float(s.get("end", 0.0))
-            tx = str(s.get("text", "") or "").strip()
-        else:
-            sp = getattr(s, "speaker", "unknown")
-            st = float(getattr(s, "start", 0.0))
-            en = float(getattr(s, "end", 0.0))
-            tx = str(getattr(s, "text", "") or "").strip()
-
-        if en > st and tx:
-            out.append({"speaker": str(sp), "start": st, "end": en, "text": tx})
-
-    out.sort(key=lambda x: x["start"])
-    return out
-
-
-def split_by_speaker(
-    diarized_segments: List[Dict[str, Any]],
-    *,
-    a_speaker: str = "A",
-) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Returns (A_segments, other_segments) where:
-      - A_segments: speaker == a_speaker
-      - other_segments: everyone else (B, C, unknown, ...)
-    """
-    a_norm = str(a_speaker).strip().upper()
-    a_list: List[Dict[str, Any]] = []
-    other_list: List[Dict[str, Any]] = []
-
-    for s in diarized_segments:
-        sp = str(s.get("speaker", "unknown")).strip().upper()
-        if sp == a_norm:
-            a_list.append(s)
-        else:
-            other_list.append(s)
-
-    a_list.sort(key=lambda x: x["start"])
-    other_list.sort(key=lambda x: x["start"])
-    return a_list, other_list
-
-
-# ----------------------------
-# overlap + interruption detectors
-# ----------------------------
-def detect_any_overlaps(
-    left: List[Dict[str, Any]],
-    right: List[Dict[str, Any]],
-    *,
-    min_overlap_ms: int = 200,
+    # minimalny realny overlap
+    min_overlap_ms: int = 250,
+    # tolerancja na błędy timestampów (żeby nie gubić borderline)
     eps_ms: int = 30,
-    min_segment_ms_left: int = 0,
-    min_segment_ms_right: int = 0,
-    min_words_left: int = 0,
-    min_words_right: int = 0,
+
+    # filtry jakości segmentów (żeby odsiać backchannel/śmieci)
+    min_segment_ms_ag: int = 0,
+    min_segment_ms_cl: int = 0,
+    min_words_ag: int = 0,
+    min_words_cl: int = 0,
+
+    # ✅ NOWE: ignoruj overlap, jeśli zaczyna się w "ogonku" segmentu (tail)
+    # typowo dla call-center: ignoruj ogon AG (bo CL często wchodzi "tak/aha" na końcu)
+    ignore_tail_ms_ag: int = 0,
+    ignore_tail_ms_cl: int = 0,
 ) -> List[Dict[str, Any]]:
     """
-    Any overlap windows between any left/right segments (regardless of who started first),
-    with optional filters to ignore short segments / short utterances.
+    Szuka wszystkich nakładających się odcinków pomiędzy segmentami AG i CL.
+    Zwraca listę overlap-okien: overlap_start/end, overlap_sec + referencje do segów.
+
+    Wersja bazuje na logice z evaluation_interrupts.py, ale:
+    - ma dodatkowe filtry (min_words/min_segment)
+    - ma filtr ignore_tail_ms_* do wycinania overlapów na końcówkach wypowiedzi
+      (typowy backchannel: klient wchodzi w ostatnie 0.5–1.0s wypowiedzi AG)
     """
+
     min_overlap = min_overlap_ms / 1000.0
     eps = eps_ms / 1000.0
-    min_seg_left = min_segment_ms_left / 1000.0
-    min_seg_right = min_segment_ms_right / 1000.0
 
-    def left_ok(seg: Dict[str, Any]) -> bool:
+    min_seg_ag = min_segment_ms_ag / 1000.0
+    min_seg_cl = min_segment_ms_cl / 1000.0
+
+    tail_ag = ignore_tail_ms_ag / 1000.0
+    tail_cl = ignore_tail_ms_cl / 1000.0
+
+    def ag_ok(seg: Dict[str, Any]) -> bool:
         dur = float(seg["end"]) - float(seg["start"])
-        if dur + eps < min_seg_left:
+        if dur + eps < min_seg_ag:
             return False
-        if _word_count(str(seg.get("text", ""))) < min_words_left:
+        if _word_count(str(seg.get("text", ""))) < min_words_ag:
             return False
         return True
 
-    def right_ok(seg: Dict[str, Any]) -> bool:
+    def cl_ok(seg: Dict[str, Any]) -> bool:
         dur = float(seg["end"]) - float(seg["start"])
-        if dur + eps < min_seg_right:
+        if dur + eps < min_seg_cl:
             return False
-        if _word_count(str(seg.get("text", ""))) < min_words_right:
+        if _word_count(str(seg.get("text", ""))) < min_words_cl:
             return False
         return True
 
     i = j = 0
     out: List[Dict[str, Any]] = []
 
-    while i < len(left) and j < len(right):
-        L = left[i]
-        R = right[j]
+    # zakładamy że listy są posortowane po start
+    # (jeśli nie masz pewności, sortuj przed wywołaniem)
+    while i < len(ag_segs) and j < len(cl_segs):
+        A = ag_segs[i]
+        C = cl_segs[j]
 
-        s = max(float(L["start"]), float(R["start"]))
-        e = min(float(L["end"]), float(R["end"]))
+        a_s = float(A["start"])
+        a_e = float(A["end"])
+        c_s = float(C["start"])
+        c_e = float(C["end"])
+
+        # wyznacz część wspólną
+        s = max(a_s, c_s)
+        e = min(a_e, c_e)
         overlap = e - s
 
-        if overlap + eps >= min_overlap and left_ok(L) and right_ok(R):
-            out.append(
-                {
-                    "overlap_start": s,
-                    "overlap_end": e,
-                    "overlap_sec": round(overlap, 3),
-                    "left_seg": L,
-                    "right_seg": R,
-                }
-            )
+        if overlap + eps >= min_overlap and ag_ok(A) and cl_ok(C):
+            # ✅ filtr: ignoruj overlap jeśli startuje w "tail" jednego z segmentów
+            # tail liczymy jako: (end - overlap_start) <= tail_window
+            in_tail_ag = (tail_ag > 0.0) and ((a_e - s) <= tail_ag)
+            in_tail_cl = (tail_cl > 0.0) and ((c_e - s) <= tail_cl)
 
-        if float(L["end"]) < float(R["end"]):
+            if not (in_tail_ag or in_tail_cl):
+                out.append(
+                    {
+                        "overlap_start": s,
+                        "overlap_end": e,
+                        "overlap_sec": round(overlap, 3),
+                        "ag_seg": A,
+                        "cl_seg": C,
+                    }
+                )
+
+        # przesuń wskaźnik krótszego segmentu (klasyczny merge-scan)
+        if a_e < c_e:
             i += 1
         else:
             j += 1
@@ -286,7 +173,11 @@ def detect_any_overlaps(
     return out
 
 
-def detect_starts_while_other_speaks(
+
+
+
+
+def detect_starts_while_other_speaks_turns(
     starter_segs: List[Dict[str, Any]],
     while_segs: List[Dict[str, Any]],
     *,
@@ -294,37 +185,81 @@ def detect_starts_while_other_speaks(
     min_starter_segment_ms: int = 200,
     min_other_lead_ms: int = 0,
     eps_ms: int = 30,
+
+    # ✅ NOWE: filtry "backchannel / tail"
+    min_starter_words: int = 0,
+    ignore_tail_ms_other: int = 0,
+    min_other_remaining_ms: int = 0,
 ) -> List[Dict[str, Any]]:
     """
-    Events where STARTER starts while OTHER is ongoing:
-      other.start + lead <= starter.start < other.end
-    and overlap >= threshold.
+    Wykrywa przypadki, gdy starter zaczyna mówić w trakcie wypowiedzi other.
+    Zwraca listę eventów (interruptions).
+
+    Dodane filtry:
+      - min_starter_words: ignoruj wtrącenia zbyt krótkie tekstowo
+      - ignore_tail_ms_other: ignoruj, jeśli starter zaczyna w "ogonku" other
+      - min_other_remaining_ms: ignoruj, jeśli other ma za mało czasu do końca w momencie wejścia startera
     """
+
     min_overlap_sec = min_overlap_ms / 1000.0
     min_starter_seg_sec = min_starter_segment_ms / 1000.0
     min_other_lead_sec = min_other_lead_ms / 1000.0
     eps = eps_ms / 1000.0
 
+    tail_other_sec = ignore_tail_ms_other / 1000.0
+    min_other_remaining_sec = min_other_remaining_ms / 1000.0
+
+    # helper: starter ok?
+    def starter_ok(seg: Dict[str, Any]) -> bool:
+        dur = float(seg["end"]) - float(seg["start"])
+        if dur + eps < min_starter_seg_sec:
+            return False
+        if _word_count(str(seg.get("text", ""))) < min_starter_words:
+            return False
+        return True
+
     events: List[Dict[str, Any]] = []
     j = 0
     nS = len(starter_segs)
 
+    # zakładamy posortowane po czasie
     for o in while_segs:
-        o_s, o_e, o_text = o["start"], o["end"], o["text"]
+        o_s = float(o["start"])
+        o_e = float(o["end"])
+        o_text = str(o.get("text", ""))
 
-        while j < nS and starter_segs[j]["end"] <= o_s + eps:
+        # przesuń startery, które kończą się przed startem "other"
+        while j < nS and float(starter_segs[j]["end"]) <= o_s + eps:
             j += 1
 
         k = j
-        while k < nS and starter_segs[k]["start"] < o_e + eps:
+        # iteruj startery, które mogą nachodzić na "other"
+        while k < nS and float(starter_segs[k]["start"]) < o_e + eps:
             st = starter_segs[k]
-            st_s, st_e, st_text = st["start"], st["end"], st["text"]
+            st_s = float(st["start"])
+            st_e = float(st["end"])
+            st_text = str(st.get("text", ""))
 
-            if (st_e - st_s) < min_starter_seg_sec:
+            # filtr długości + słów startera
+            if not starter_ok(st):
                 k += 1
                 continue
 
+            # starter musi zacząć w trakcie other, ale nie wcześniej niż min_other_lead
+            # (czyli other musi już chwilę mówić)
             if (o_s + min_other_lead_sec) <= st_s < (o_e + eps):
+
+                # ✅ filtr "ogon": jeśli starter wszedł w ostatnie X ms other -> pomiń
+                if tail_other_sec > 0.0 and (o_e - st_s) <= tail_other_sec:
+                    k += 1
+                    continue
+
+                # ✅ filtr: other musi mieć jeszcze minimalny "czas do końca"
+                if min_other_remaining_sec > 0.0 and (o_e - st_s) < min_other_remaining_sec:
+                    k += 1
+                    continue
+
+                # overlap liczony od startu startera
                 overlap = min(st_e, o_e) - st_s
                 if overlap + eps >= min_overlap_sec:
                     events.append(
@@ -339,213 +274,92 @@ def detect_starts_while_other_speaks(
                             "other_text": o_text,
                         }
                     )
+
             k += 1
 
     return events
 
 
-# ----------------------------
-# main analysis (NO split L/R)
-# ----------------------------
-async def async_analyze_diarized_groups(
-    audio_file: str,
-    *,
-    a_speaker: str = "A",
+def analyze_turn_overlaps(
+    turns: List[Turn],
     min_overlap_ms: int = 250,
     eps_ms: int = 30,
+    # dla “interruptions”
     min_agent_segment_ms: int = 200,
     min_client_segment_ms: int = 200,
     min_other_lead_ms: int = 0,
-
-    # overlap filters (optional)
+    # opcjonalne filtry w detect_any_overlaps
     min_segment_ms_agent: int = 0,
     min_segment_ms_client: int = 0,
     min_words_agent: int = 0,
-    min_words_client: int = 0
+    min_words_client: int = 0,
+    # pre-merge (jak w evaluation_interrupts.py)
+    merge_gap_ms_agent: int = 350,
+    merge_gap_ms_client: int = 350,
+    ignore_tail_ms_ag: int = 0,
+    ignore_tail_ms_cl: int = 0,
 ) -> Dict[str, Any]:
-    
-    # labels for merged dialogue output
-    agent_label: str = "AG"
-    client_label: str = "CL"
-    
-    # 1) diarize original file
-    clean_audio_file_path = clean_audio_file(str(audio_file))
-    diarized = await async_transcript_audio_file_verbose_o4_diarize(file_name=clean_audio_file_path)
+    """
+    Analiza overlapów/interruptions na podstawie listy Turn(role in {"AG","CL"}).
 
-    # 2) create two lists: A and (B + all rest)
-    agent_segs, client_segs = split_by_speaker(diarized, a_speaker=a_speaker)
+    Zwraca strukturę podobną do analyze_diarized_groups() z evaluation_interrupts.py,
+    tylko bez diarization/transkrypcji – operuje na gotowych turnach. :contentReference[oaicite:6]{index=6}
+    """
+    ag_segs = _turns_to_segs(turns, "AG")
+    cl_segs = _turns_to_segs(turns, "CL")
 
-    agent_segs = merge_close_segments(agent_segs, gap_ms=350)
-    client_segs = merge_close_segments(client_segs, gap_ms=350)
+    # jak w evaluation_interrupts.py: merge_close_segments(...) :contentReference[oaicite:7]{index=7}
+    ag_segs = merge_close_segments(ag_segs, gap_ms=merge_gap_ms_agent)
+    cl_segs = merge_close_segments(cl_segs, gap_ms=merge_gap_ms_client)
 
-    # print(f"\nagents segs\n{agent_segs}")
-    a_segs_role = await async_classify_agent_or_client_prefix(format_segments(agent_segs))
-    print(f"\n'A' speaker segment role: {a_segs_role}")
-    if not a_segs_role == "AG":
-        agent_segs, client_segs = client_segs, agent_segs  # swap
-
-    # print(format_segments_2print(agent_segs, f"Speaker {agent_label}"))
-    # print(format_segments_2print(client_segs, f"Speaker {client_label}"))
-
-    # 3) overlaps (A vs rest)
-    overlaps = detect_any_overlaps(
-        agent_segs,
-        client_segs,
+    overlaps = detect_any_overlaps_turns(
+        ag_segs,
+        cl_segs,
         min_overlap_ms=min_overlap_ms,
         eps_ms=eps_ms,
-        min_segment_ms_left=min_segment_ms_agent,
-        min_segment_ms_right=min_segment_ms_client,
-        min_words_left=min_words_agent,
-        min_words_right=min_words_client,
+        min_segment_ms_ag=min_segment_ms_agent,
+        min_segment_ms_cl=min_segment_ms_client,
+        min_words_ag=min_words_agent,
+        min_words_cl=min_words_client,
+        ignore_tail_ms_ag=ignore_tail_ms_ag,
+        ignore_tail_ms_cl=ignore_tail_ms_cl,
     )
 
-    print(f"\n=== Any overlaps >= {min_overlap_ms}ms ({len(overlaps)}) ===")
-    for idx, o in enumerate(overlaps, 1):
-        print(
-            f"[{idx:03d}] {fmt_ts(o['overlap_start'])}–{fmt_ts(o['overlap_end'])} "
-            f"({o['overlap_sec']}s) | "
-            f"{agent_label}: {o['left_seg']['text']} | {client_label}: {o['right_seg']['text']}"
-        )
-
-    # interruptions in both directions
-    agent_starts_while_client = detect_starts_while_other_speaks(
-        starter_segs=agent_segs,
-        while_segs=client_segs,
+    ag_interrupts = detect_starts_while_other_speaks_turns(
+        starter_segs=ag_segs,
+        while_segs=cl_segs,
         min_overlap_ms=min_overlap_ms,
         min_starter_segment_ms=min_agent_segment_ms,
         min_other_lead_ms=min_other_lead_ms,
         eps_ms=eps_ms,
+        ignore_tail_ms_other=ignore_tail_ms_cl,
     )
-    client_starts_while_agent = detect_starts_while_other_speaks(
-        starter_segs=client_segs,
-        while_segs=agent_segs,
+
+    cl_interrupts = detect_starts_while_other_speaks_turns(
+        starter_segs=cl_segs,
+        while_segs=ag_segs,
         min_overlap_ms=min_overlap_ms,
         min_starter_segment_ms=min_client_segment_ms,
         min_other_lead_ms=min_other_lead_ms,
         eps_ms=eps_ms,
+        ignore_tail_ms_other=ignore_tail_ms_ag,
     )
-
-    def _print_events(title: str, events: List[Dict[str, Any]]):
-        print(f"\n=== {title} ({len(events)}) ===")
-        for i, e in enumerate(events, 1):
-            print(
-                f"[{i:03d}] START {fmt_ts(e['starter_start'])}  "
-                f"overlap={e['overlap_sec']}s lead={e['other_lead_sec']}s | "
-                f"starter: {e['starter_text']}  | while other: {e['other_text']}"
-            )
-
-    _print_events(f"{agent_label} starts while {client_label} is speaking", agent_starts_while_client)
-    _print_events(f"{client_label} starts while {agent_label} is speaking", client_starts_while_agent)
-
-    # merged dialogue (time order)
-    dialogue = merged_dialogue_text(
-        agent_segs=agent_segs,
-        client_segs=client_segs,
-        agent_label=agent_label,
-        client_label=client_label,
-        include_timestamps=True,
-    )
-    print(f"\n=== Merged Dialogue ({len(dialogue)} chars) ===\n{dialogue}")
 
     return {
-        "segments": {"agent": agent_segs, "client": client_segs},
+        "segments": {"agent": ag_segs, "client": cl_segs},
         "overlaps": overlaps,
         "events": {
-            "agent_starts_while_client": agent_starts_while_client,
-            "client_starts_while_agent": client_starts_while_agent,
+            "agent_starts_while_client": ag_interrupts,
+            "client_starts_while_agent": cl_interrupts,
         },
-        "dialogue": dialogue,
         "stats": {
-            "agent_segments": len(agent_segs),
-            "client_segments": len(client_segs),
+            "agent_segments": len(ag_segs),
+            "client_segments": len(cl_segs),
             "any_overlaps": len(overlaps),
-            "agent_interrupts": len(agent_starts_while_client),
-            "client_interrupts": len(client_starts_while_agent),
+            "agent_interrupts": len(ag_interrupts),
+            "client_interrupts": len(cl_interrupts),
             "min_overlap_ms": min_overlap_ms,
             "eps_ms": eps_ms,
             "min_other_lead_ms": min_other_lead_ms,
-            "a_speaker": a_speaker,
         },
     }
-
-async def async_detect_agent_interruptions(file_name: str) -> Dict[str, Any]:
-    """
-    Detect whether a call recording contains meaningful overlapping speech / interruptions.
-
-    The function runs a diarized transcription analysis on the given audio file using
-    `analyze_diarized_groups()`. It treats speaker "A" as the agent group and aggregates
-    all other diarized speakers ("B" + any others) as the client group. It then computes
-    overlaps/interruptions between these two groups and returns a simple YES/NO decision
-    based on the number of detected overlaps.
-
-    Parameters
-    ----------
-    file_name : str
-        Path to the audio file to analyze (e.g., WAV/MP3).
-
-    Returns
-    -------
-    Optional[str]
-        - "YES" if the analysis detected more than one overlap event
-          (`res["stats"]["any_overlaps"] > 1`).
-        - "NO" if overlap events are <= 1.
-        - None if an exception occurs during processing (the error is printed).
-
-    Notes
-    -----
-    This function is a thin wrapper over `analyze_diarized_groups()` and uses the following
-    tuning parameters:
-
-    - a_speaker="A":
-        Speaker label assumed to represent the agent in diarized output.
-    - min_overlap_ms=450:
-        Minimum overlap duration (ms) required to count an overlap event. Higher values
-        ignore short overlaps (e.g., brief backchannel words).
-    - eps_ms=30:
-        Timestamp tolerance (ms) to account for diarization/ASR timing jitter.
-    - min_agent_segment_ms=200 / min_client_segment_ms=200:
-        Minimum segment duration (ms) for interruption detection logic.
-    - min_other_lead_ms=0:
-        Allows detecting interruptions even when both parties start nearly simultaneously.
-        Increase this value to focus on "true" interruptions where the other speaker has
-        already been speaking for some time.
-    - min_segment_ms_agent=200 / min_segment_ms_client=200 and min_words_agent=1 / min_words_client=1:
-        Filters for overlap detection to ignore very short segments and extremely short utterances.
-
-    The function prints the `stats` returned by `analyze_diarized_groups()` for debugging.
-
-    Examples
-    --------
-    >>> result = detect_agent_interruptions("call.wav")
-    >>> if result == "YES":
-    ...     print("Overlapping speech detected")
-    ... elif result == "NO":
-    ...     print("No meaningful overlaps detected")
-    ... else:
-    ...     print("Analysis failed")
-    """
-    try:
-        res = await async_analyze_diarized_groups(
-            file_name,
-            a_speaker="A",          # group A vs (B+rest)
-            min_overlap_ms=450,
-            eps_ms=30,
-            min_agent_segment_ms=200,
-            min_client_segment_ms=200,
-            min_other_lead_ms=0,
-
-            # OPTIONAL: ignore short “backchannel”:
-            min_segment_ms_agent=200,
-            min_segment_ms_client=200,
-            min_words_agent=1,
-            min_words_client=1,
-        )
-    
-        return res
-    
-    except Exception as e:
-        print(f"Error processing file '{file_name}': {e}")
-        return None
-    
-
-

@@ -49,6 +49,10 @@ def _default_detect_speaker_role_model() -> str:
 def _default_split_into_roles_model() -> str:
     return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
 
+def _default_transcription_model() -> str:
+    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
+
+
 
 def _fmt_ts(sec: float) -> str:
     """Format seconds as MM:SS.mmm."""
