@@ -766,27 +766,37 @@ don't generate new answer schema if there is any already fitting.
 
 I need to extend the configuration of evaluation. Question is: 
 " 
-Detect if there are no bad markers, there are bad or there are critical markers in the converation. Show only one string: critical or bad or ok in value field. Show evidence in field
-citation, score is always 0.
+Detect if there are Фрази введення в оману	
+Show only one string: critical or ok in value field. Show evidence in field citation.
 
-хороший маркер
-проговорення домовленості в сумах та датах, похвала клієнта
+Bad sentences
+Вам нарахують величезні штрафи
+У вас є борг. Клієнт стверджує що оплатів або не признає борг
+Відсотки розраховуються на рік вперед тому достроково неможливо оплатити заборгованість
+я займаюсь з врегулюванням заборгованості
+якщо не заплатите терміново борг, банк подасть до суду
+банк не буде розглядати реструктуризацію вашого боргу
+це вам нарахували відсотки за протемінування боргу
+можете не укладати договір страхування
 
 
 
-поганий маркет
-завершення без підсумку, підсумок без деталізації ("домовились як раніше озвучували.. ", ) завершення розмови фахівцем до озвучування причини дзвінка і суми боргу
+Good senteces
+штрафи та пеня відповідно до умов договору
+Давайте я перевірю. Чи можете надіслати квитанцію про платіж? Може давайте ми зробимо розрахунок заборгованості?
+Відсотки розраховуються відповідно до графіку вашого договору
+я працюю в департаменті софт-колектингу
 
-
-критические маркери
-завершити розмови в односторонньому порядку без повідомлення інформації про причину дзвінка 
+ми завжди готові розглянуту реструктуризацію вашого боргу
+частину боргу складають протерміновані відсотки (не додаткові)
+договір страхування треба обов'язково укладати це є умовою кредитного договору
 
 
 "
-Weight is always 0, max value is 0.. 
+Score should should be 1 if ok and 0 if critical. Weight 1. 
 Show me prompts and configurations. Use English for prompt and ukrainian for phrase examples. brackets {} can be only for metadata and transcript. If you need it for other purpose then in prompts text always use {{}}.
 If criteria are not clear for you ask questions.
-Use prefix G4_ for new files names.
+Use prefix MANIPULATION_ for new files names.
 don't generate new answer schema if there is any already fitting.
 
 

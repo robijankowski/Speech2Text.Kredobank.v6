@@ -1,0 +1,12 @@
+{
+  "id": "MANIPULATION_misleading_phrases_level",
+  "desc": "Detect misleading/deceptive phrases (введення в оману). Output value critical/ok + evidence. score=1 if ok else 0.",
+  "weight": 1.0,
+  "max_points": 1,
+  "temperature": 0.0,
+  "schema_name": "misleading_phrases_critical_ok_with_citation",
+  "system_prompt_file": "prompts/MANIPULATION_misleading_phrases_system.txt",
+  "user_prompt_file": "prompts/MANIPULATION_misleading_phrases_user.txt",
+  "response_schema_file": "schemas/text_value_citation.schema.json",
+  "result_key": "score"
+}

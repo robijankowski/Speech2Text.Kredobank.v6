@@ -16,13 +16,19 @@
     "checks/2_04_clarifying_questions.json",
     "checks/2_05_paraphrased_client.json",
     "checks/3_02_negotiation_methods_yesno.json",
+    "checks/3_03_agent_used_client_history_yesno.json",
     "checks/3_04_answered_all_client_questions_yesno.json",
     "checks/3_05_client_promised_to_settle_debt_yesno.json",
     "checks/4_01_agent_detailed_end_summary_yesno.json",
-    "checks/4_02_agent_said_goodbye_yesno.json"
+    "checks/4_02_agent_said_goodbye_yesno.json",
+    "checks/G1_marker_level.json",
+    "checks/G2_empathy_marker_level.json",
+    "checks/G3_negotiation_marker_level.json",
+    "checks/G4_call_closure_marker_level.json",
+    "checks/MANIPULATION_misleading_phrases_level.json"
   ],
   "checks": [
-    "checks/1_08_client_stated_debt_reason_raw.json"
+    "checks/MANIPULATION_misleading_phrases_level.json"
 ],
   "conditional_checks": {
     "FINPHONEYES": [

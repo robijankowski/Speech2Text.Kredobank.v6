@@ -1,0 +1,11 @@
+Classify the conversation empathy/communication marker level (critical/bad/ok). Provide brief evidence quotes.
+
+Call metadata:
+"""
+<metadata>{metadata}</metadata>
+"""
+
+Transcript:
+"""
+<transcript>{transcript}</transcript>
+"""

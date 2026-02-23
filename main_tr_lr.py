@@ -193,11 +193,11 @@ async def async_run_transcription(start_index=0, end_index=None):
 
             scenario = TEST_SCENARIO
 
-            log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
-            summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
-            log.info(f"Summary for file number {audio_file} :\n{summary}")
+            # log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
+            # summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
+            # log.info(f"Summary for file number {audio_file} :\n{summary}")
 
-            return
+            # return
             # log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
             # res_interrupts = await async_evaluate_conversation_interrupts_pipeline(turns=turns, file_name=audio_file) # this is not async - pure calcs.
             # log.info(f"Evaluation interrupts result {audio_file} :\n{res_interrupts}")
@@ -212,7 +212,7 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                                     prev_result=None,
                                                                     interrupts_analysis=res_interrupts
                                                                     )
-            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, indent=2)}")
+            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, ensure_ascii=False, indent=2)}")
 
             return
             log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for  file name: '{audio_file}'\n")

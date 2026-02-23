@@ -6,6 +6,9 @@ from openai_tools.openai_client_transcribe import async_transcribe_audio, Transc
 from core.config import settings
 from transcribe.utilities.stats import set_stats
 
+def _default_transcription_model() -> str:
+    # normal transcription model (NOT diarize)
+    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
 
 
 
@@ -81,9 +84,6 @@ Known entities canonical names: {metadata}
 ПАМ'ЯТАЙ: Твоє завдання - точно відтворити ТЕ, ЩО БУЛО СКАЗАНО, а не те, що "повинно було б" бути сказано!
 """
 
-def _default_transcription_model() -> str:
-    # normal transcription model (NOT diarize)
-    return settings.AZURE_MODEL_TRANSCRIBE_STEREO if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_TRANSCRIBE_STEREO
 
 
 
@@ -115,7 +115,6 @@ async def async_transcript_audio_file_verbose_o4_single_channel(
     log.info("\n" + str(transcription.usage))   
 
     return transcription
-
 
 
 async def async_transcript_audio_file_verbose_o4_stereo(file_name: str, 

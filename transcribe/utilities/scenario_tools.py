@@ -44,13 +44,11 @@ from openai_tools.openai_client_text import async_chat_completion, async_chat_co
 
 
 def _default_detect_speaker_role_model() -> str:
-    # normal transcription model (NOT diarize)
     return settings.AZURE_MODEL_CHAT_TRS_DETECT_PLAYER if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_DETECT_PLAYER
 
-
 def _default_split_into_roles_model() -> str:
-    # normal transcription model (NOT diarize)
     return settings.AZURE_MODEL_CHAT_TRS_SPLIT_INTO_ROLES if settings.USE_AZURE_OPENAI == "Y" else settings.OPENAI_MODEL_CHAT_TRS_SPLIT_INTO_ROLES
+
 
 def _fmt_ts(sec: float) -> str:
     """Format seconds as MM:SS.mmm."""
@@ -78,6 +76,7 @@ def remap_turn_roles(turns: List[Turn]) -> List[Turn]:
             t.role = role_map[r]
     return turns
 
+
 def render_timestamped_script_from_turns(
     turns: Sequence[Turn],
     timestamp_on: bool = True,
@@ -89,7 +88,6 @@ def render_timestamped_script_from_turns(
         rl = f"{t.role}" if role_on else ""
         lines.append(f"{ts}{rl}: {t.text}")
     return "\n".join(lines) + "\n"
-
 
 def render_timestamped_script_from_diar_segs(
     segs: Iterable[Any],
@@ -133,7 +131,6 @@ def render_timestamped_script_from_diar_segs(
         lines.append(line)
 
     return "\n".join(lines) + "\n"
-
 
 def render_turns_tight_vs_ext(
     turns: List[Turn],
@@ -334,9 +331,6 @@ SCHEMA_SPEAKER_DETECTION = {
     "additionalProperties": False
 }
 
-
-
-
 async def async_detect_speaker_roles(text1: str, text2: str, model: str = "") -> dict:
     """
     Detect which transcribed text belongs to the bank AGENT and which to the CLIENT.
@@ -501,7 +495,6 @@ SCHEMA_SINGLE_SPEAKER_ROLE = {
     "additionalProperties": False
 }
 
-
 async def async_classify_agent_or_client_prefix(text: str, model: str = "") -> str:
     """
     Classify a single transcript text block as AGENT or CLIENT and return prefix:
@@ -548,3 +541,4 @@ Return only the structured classification.
     result = json.loads(resp.choices[0].message.content)
     return result["speaker"]
     return "AG" if result["speaker"] == "AGENT" else "CL"
+

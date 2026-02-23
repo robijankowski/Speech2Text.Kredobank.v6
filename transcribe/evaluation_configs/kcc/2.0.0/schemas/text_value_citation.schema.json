@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "score": {
+      "type": "integer",
+      "enum": [0],
+      "description": "Always 0 for this marker classification check."
+    },
+    "value": {
+      "type": "string",
+      "enum": ["critical", "bad", "ok"],
+      "description": "Overall marker level for the conversation."
+    },
+    "citation": {
+      "type": "string",
+      "description": "Short evidence from the transcript: 1–3 short quotes (with timestamps if present). If ok, explain briefly that no bad/critical markers were found."
+    }
+  },
+  "required": ["score", "value", "citation"]
+}

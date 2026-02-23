@@ -1,0 +1,12 @@
+{
+  "id": "G1_marker_level",
+  "desc": "Classify conversation marker level: ok / bad / critical. Provide evidence. Score is always 0.",
+  "weight": 0.0,
+  "max_points": 0,
+  "temperature": 0.0,
+  "schema_name": "marker_level_with_citation",
+  "system_prompt_file": "prompts/G1_marker_level_system.txt",
+  "user_prompt_file": "prompts/G1_marker_level_user.txt",
+  "response_schema_file": "schemas/text_value_citation.schema.json",
+  "result_key": "score"
+}
