@@ -4,14 +4,14 @@ from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 # Twoje moduły z projektu:
-from transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
-from transcribe.utilities.transcribe_stereo_tools import async_transcript_audio_file_verbose_o4_single_channel
+from app.transcribe.utlities.audio_tools import split_stereo_to_lr_and_clean
+from app.transcribe.utlities.transcribe_stereo_tools import async_transcript_audio_file_verbose_o4_single_channel
 from openai import OpenAI
 
 
 ChannelSide = Literal["L", "R"]
 
-from core.config import settings    
+from app.core.config import settings    
 
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 

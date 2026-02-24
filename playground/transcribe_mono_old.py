@@ -1,9 +1,9 @@
-from core.logger import get_logger, shutdown_logger
+from app.core.logger import get_logger, shutdown_logger
 log = get_logger(__name__)
 
-from core.config import settings
+from app.core.config import settings
 from transcribe.utilities.o4_transcribe_diarized import transcript_audio_file_verbose_o4_diarize
-from transcribe.utilities.scenario_tools import async_detect_speaker_roles
+from app.transcribe.utlities.scenario_tools import async_detect_speaker_roles
 import re
 
 

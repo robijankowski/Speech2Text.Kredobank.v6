@@ -7,7 +7,7 @@
 *.wav
 .keys
 /config/.keys
-logs
+/logs
 HelpDesk.log
 HelpDesk.log.*
 __pycache__/
@@ -26,5 +26,6 @@ users.json
 /admin_console_logs 
 /analyzer_logs 
 /temp1 
+/temp
 /documentationKredoBank
 

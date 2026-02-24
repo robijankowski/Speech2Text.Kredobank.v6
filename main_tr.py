@@ -2,12 +2,12 @@ from datetime import  date
 import json
 import asyncio
 
-from core.config import settings
-from core.logger import get_logger, shutdown_logger
+from app.core.config import settings
+from app.core.logger import get_logger, shutdown_logger
 log = get_logger(__name__)
 
 
-from transcribe.utilities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md, is_configuration_ok
+from app.transcribe.utlities.evaluation_engine_qa import audit_evaluation_configs, format_audit_report_md, is_configuration_ok
 
 
 
@@ -146,7 +146,7 @@ CALL_DATE = date(2026, 1,15)
 SYSTEM_CODE = "kcc"
 
 
-from transcribe.utilities.transcribe_pipeline import (async_transcribe_audio_file_to_scenario_pipeline,
+from app.transcribe.utlities.transcribe_pipeline import (async_transcribe_audio_file_to_scenario_pipeline,
                                                       async_generate_scenario_summary_pipeline,
                                                       async_evaluate_transcripted_scenario_pipeline,
                                                       async_run_analysis_of_the_transcription_pipeline,
@@ -179,7 +179,7 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                           )
             log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
 
-
+            return
             
             log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
             summary = await async_generate_scenario_summary_pipeline(scenario=scenario)

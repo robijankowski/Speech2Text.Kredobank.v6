@@ -5,8 +5,8 @@ import httpx
 from openai import AzureOpenAI
 from contextlib import contextmanager
 
-from core.config import settings
-from core.logger import get_logger, shutdown_logger
+from app.core.config import settings
+from app.core.logger import get_logger, shutdown_logger
 log = get_logger(__name__)
 
 
