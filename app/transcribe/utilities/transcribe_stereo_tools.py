@@ -4,7 +4,7 @@ from app.core.logger import log
 from app.openai_tools.openai_client_transcribe import async_transcribe_audio, Transcription
 
 from app.core.config import settings
-from app.transcribe.utlities.stats import set_stats
+from app.transcribe.utilities.stats import set_stats
 
 def _default_transcription_model() -> str:
     # normal transcription model (NOT diarize)

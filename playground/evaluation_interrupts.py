@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 from app.core.config import settings
 from app.openai_tools.openai_client_transcribe import async_transcribe_audio_diarized
 
-from app.transcribe.utlities.audio_tools import clean_audio_file
-from app.transcribe.utlities.scenario_tools import async_classify_agent_or_client_prefix
+from app.transcribe.utilities.audio_tools import clean_audio_file
+from app.transcribe.utilities.scenario_tools import async_classify_agent_or_client_prefix
 
 
 # ----------------------------

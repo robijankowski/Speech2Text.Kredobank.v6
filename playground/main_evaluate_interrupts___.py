@@ -9,8 +9,8 @@ from app.core.config import settings
 from app.openai_tools.openai_client_transcribe_native import transcribe_audio_native_diarized
 from app.openai_tools.openai_client_transcribe import transcribe_audio_diarized
 
-from app.transcribe.utlities.audio_tools import clean_audio_file
-from app.transcribe.utlities.scenario_tools import classify_agent_or_client_prefix
+from app.transcribe.utilities.audio_tools import clean_audio_file
+from app.transcribe.utilities.scenario_tools import classify_agent_or_client_prefix
 
 
 # ----------------------------

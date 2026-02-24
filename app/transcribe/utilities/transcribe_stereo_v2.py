@@ -17,11 +17,11 @@ from app.openai_tools.openai_client_transcribe import ( async_transcribe_audio,
                                                     TranscriptionDiarizedSegment
                                                     )
 
-from app.transcribe.utlities.audio_tools_v2 import (clean_audio_file_with_silence_removal, 
+from app.transcribe.utilities.audio_tools_v2 import (clean_audio_file_with_silence_removal, 
                                                  clean_audio_file_with_silence_removal_asr
                                                  )
 
-from app.transcribe.utlities.scenario_tools_v2 import (Turn, 
+from app.transcribe.utilities.scenario_tools_v2 import (Turn, 
                                                     render_timestamped_script_from_turns
                                                     )
 

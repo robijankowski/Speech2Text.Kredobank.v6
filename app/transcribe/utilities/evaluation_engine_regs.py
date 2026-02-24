@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.logger import log
 
 
-from app.transcribe.utlities.evaluation_engine import load_scheme, SchemeDef
+from app.transcribe.utilities.evaluation_engine import load_scheme, SchemeDef
 
 
 @dataclass(frozen=True)

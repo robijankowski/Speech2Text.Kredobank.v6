@@ -7,12 +7,12 @@ from app.core.logger import log
 
 
 
-from app.transcribe.utlities.scenario_tools import ( async_split_transcription_into_roles_4o, 
+from app.transcribe.utilities.scenario_tools import ( async_split_transcription_into_roles_4o, 
                                                  consolidate_dialogue, 
                                                  async_detect_speaker_roles, 
                                                  add_prefix_to_sentences )
-from app.transcribe.utlities.audio_tools import prepare_audio_for_transcription
-from app.transcribe.utlities.transcribe_stereo_tools import ( async_transcript_audio_file_verbose_o4_stereo, 
+from app.transcribe.utilities.audio_tools import prepare_audio_for_transcription
+from app.transcribe.utilities.transcribe_stereo_tools import ( async_transcript_audio_file_verbose_o4_stereo, 
                                                           async_transcript_audio_file_verbose_o4_single_channel )
 
 

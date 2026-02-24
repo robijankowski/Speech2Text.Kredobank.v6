@@ -16,8 +16,8 @@ from app.core.config import settings
 from app.core.logger import log
 
 
-from app.transcribe.utlities.noise_reduction import reduce_audio_noise
-from app.transcribe.utlities.silence_removal import remove_long_silences
+from app.transcribe.utilities.noise_reduction import reduce_audio_noise
+from app.transcribe.utilities.silence_removal import remove_long_silences
 
 
 from pathlib import Path

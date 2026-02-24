@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app.transcribe.utlities.scenario_tools import Turn
+from app.transcribe.utilities.scenario_tools import Turn
 
 
 

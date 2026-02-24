@@ -20,13 +20,13 @@ from app.openai_tools.openai_client_transcribe import (
     Transcription,
 )
 
-from app.transcribe.utlities.audio_tools import (
+from app.transcribe.utilities.audio_tools import (
     clean_audio_file,
     remove_long_silences_in_audio,
     stereo_to_mono,
 )
 
-from app.transcribe.utlities.scenario_tools import (Turn, 
+from app.transcribe.utilities.scenario_tools import (Turn, 
                                                  DiarSeg,
                                                  render_timestamped_script_from_turns,
                                                  render_timestamped_script_from_diar_segs,
@@ -34,7 +34,7 @@ from app.transcribe.utlities.scenario_tools import (Turn,
                                                  consolidate_dialogue
                                                  )
 
-from app.transcribe.utlities.transcribe_mono_tools import (async_split_transcription_into_roles_4o,
+from app.transcribe.utilities.transcribe_mono_tools import (async_split_transcription_into_roles_4o,
                                                             async_transcript_audio_file_verbose_o4_single_channel,
                                                             async_transcript_audio_file_verbose_o4_stereo,
                                                             async_classify_all_speakers_agent_or_client

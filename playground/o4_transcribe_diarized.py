@@ -2,7 +2,7 @@ from openai import OpenAI
 import re
 import base64
 
-from app.transcribe.utlities.stats import set_stats
+from app.transcribe.utilities.stats import set_stats
 from app.core.config import settings    
 
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)

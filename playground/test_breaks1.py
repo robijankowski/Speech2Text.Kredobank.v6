@@ -4,8 +4,8 @@ from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 # Twoje moduły z projektu:
-from app.transcribe.utlities.audio_tools import split_stereo_to_lr_and_clean
-from app.transcribe.utlities.transcribe_stereo_tools import async_transcript_audio_file_verbose_o4_single_channel
+from app.transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
+from app.transcribe.utilities.transcribe_stereo_tools import async_transcript_audio_file_verbose_o4_single_channel
 from openai import OpenAI
 
 

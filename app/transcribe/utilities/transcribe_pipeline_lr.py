@@ -10,15 +10,18 @@ from pydub import AudioSegment
 from app.core.config import settings
 from app.core.logger import log
 
-from app.transcribe.utlities.scenario_tools import Turn
+from app.transcribe.utilities.scenario_tools import Turn, render_timestamped_script_from_turns, remap_turn_roles
 
-from app.transcribe.utlities.transcribe_stereo_v2 import async_transcribe_stereo_hq_roles_to_turns_v2
-from app.transcribe.utlities.summary_tools import async_generate_crm_summary_for_call_scenario_ext
-from app.transcribe.utlities.evaluation_interrupts import analyze_turn_overlaps 
-from app.transcribe.utlities.call_analysis_engine import async_analyze_transcription_questions
-from app.transcribe.utlities.evaluation_engine_regs import load_active_scheme 
-from app.transcribe.utlities.evaluation_engine import async_run_scheme
+from app.transcribe.utilities.summary_tools import async_generate_crm_summary_for_call_scenario_ext
+# from transcribe.utilities.transcribe_mono import async_transcribe_mono_audio_file_to_scenario
+from app.transcribe.utilities.transcribe_mono_lr import async_transcribe_mono_timestamped_lr
+from app.transcribe.utilities.transcribe_stereo_lr import async_transcribe_stereo_timestamped_lr
+from app.transcribe.utilities.evaluation_interrupts import analyze_turn_overlaps # no async need - just calc
+from app.transcribe.utilities.evaluation_engine import async_run_scheme
 
+from app.transcribe.utilities.evaluation_engine_regs import load_active_scheme # no async need - just calc
+
+from app.transcribe.utilities.call_analysis_engine import async_analyze_transcription_questions
 
 
 # -----------------------------
@@ -28,25 +31,37 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
     *,
     source_file: str,
     metadata: Any = None,
-    temp_root_dir: str = None
+    temp_root_dir: str = None,
+    temperature: float = 0.0,
+    timeout: float = 120.0,
+    force_mono: bool = False,
 ) -> Tuple[List[Turn], str]:
     """
     One entry point for your app:
       - If stereo and not force_mono -> use your existing stereo pipeline
       - Else -> mono pipeline above
     """
-    temp_root_dir = settings.TR_TEMP_ROOT_DIR
+    audio = AudioSegment.from_file(source_file)
+    is_stereo = (audio.channels == 2)
 
-    diar_segs_turns, scenario = await async_transcribe_stereo_hq_roles_to_turns_v2(source_file=source_file,
-                                                                            temp_root_dir=temp_root_dir,
-                                                                            metadata=metadata 
-                                                                            )
-                                                                
-    return diar_segs_turns, scenario 
+    if not temp_root_dir:
+        temp_root_dir = settings.TR_TEMP_ROOT_DIR
 
+    if is_stereo and not force_mono:
+        turns, scenario = await async_transcribe_stereo_timestamped_lr(source_file=source_file,
+                                                        temp_root_dir=temp_root_dir,
+                                                        metadata=metadata 
+                                                        )
+    else:
+        turns, scenario = await async_transcribe_mono_timestamped_lr(  source_file=source_file,
+                                                        temp_root_dir=temp_root_dir,
+                                                        metadata=metadata 
+                                                        )
+                                              
+    turns = remap_turn_roles(turns)
+    scenario = render_timestamped_script_from_turns(turns, timestamp_on=False, role_on=True)
 
-
-
+    return turns, scenario 
 
 
 async def async_generate_scenario_summary_pipeline(
@@ -65,7 +80,7 @@ async def async_generate_scenario_summary_pipeline(
 
 
 async def async_evaluate_conversation_interrupts_pipeline(
-    diar_segs_turns: List[Turn] = None,
+    turns: List[Turn] = None,
     file_name: str = "",
     model_override: str = ""
 ) -> Dict[str, Any]:
@@ -78,28 +93,8 @@ async def async_evaluate_conversation_interrupts_pipeline(
     if not settings.TR_EVALUATE_INTERRUPTS == "Y":
         return None
     
-
-
-    overlaps_res = await asyncio.to_thread(
-        analyze_turn_overlaps,
-        diar_segs_turns,
-        # IMPORTANT: disable internal per-role merge to avoid spanning across the other speaker :contentReference[oaicite:7]{index=7}
-        merge_gap_ms_agent=0,
-        merge_gap_ms_client=0,
-        # keep your existing thresholds:
-        min_overlap_ms=450,
-        eps_ms=30,
-        min_agent_segment_ms=200,
-        min_client_segment_ms=800,
-        min_words_agent=1,
-        min_words_client=2,   # (often you can lower this if drop_backchannels=True)
-        ignore_tail_ms_ag=1500,
-        ignore_tail_ms_cl=100,
-    )
-
-    # overlaps_res = await asyncio.to_thread(
-    #     analyze_turn_overlaps,
-    #     diar_segs_turns,
+    # overlaps_res = analyze_turn_overlaps_lr(
+    #     turns,
     #     min_overlap_ms=450,
     #     eps_ms=30,
     #     min_agent_segment_ms=200,
@@ -108,10 +103,28 @@ async def async_evaluate_conversation_interrupts_pipeline(
     #     min_segment_ms_agent=200,
     #     min_segment_ms_client=200,
     #     min_words_agent=1,
-    #     min_words_client=2,
+    #     min_words_client=4,
+    #     # if CL starts talking before AG finished, ignore up to 1500ms of AG tail as possible overlap
     #     ignore_tail_ms_ag=1500,
+    #     # if AG starts talking before CL finished, ignore up to 100ms of CL tail as possible overlap
     #     ignore_tail_ms_cl=100,
     # )
+
+    overlaps_res = await asyncio.to_thread(
+        analyze_turn_overlaps,
+        turns,
+        min_overlap_ms=450,
+        eps_ms=30,
+        min_agent_segment_ms=200,
+        min_client_segment_ms=800,
+        min_other_lead_ms=0,
+        min_segment_ms_agent=200,
+        min_segment_ms_client=200,
+        min_words_agent=1,
+        min_words_client=4,
+        ignore_tail_ms_ag=1500,
+        ignore_tail_ms_cl=100,
+    )
 
     stats = (overlaps_res or {}).get("stats") or {}
     any_overlaps = int(stats.get("any_overlaps") or 0)
@@ -130,7 +143,7 @@ async def async_evaluate_conversation_interrupts_pipeline(
 
 
     return {
-        "id": "2_03_conversation_interrupts",
+        "id": "conversation_interrupts_lr",
         "desc": "Conversation overlaps / interruptions (LR timestamped, rule-based)",
         "score": int(score),
         "max_points": int(max_points),
@@ -144,8 +157,6 @@ async def async_evaluate_conversation_interrupts_pipeline(
             "stats": overlaps_res["stats"],
         },
     }
-
-
 
 
 
@@ -198,8 +209,6 @@ async def async_evaluate_transcripted_scenario_pipeline(
     )
 
     return result, success
-
-
 
 
 

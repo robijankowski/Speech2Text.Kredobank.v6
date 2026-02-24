@@ -3,7 +3,7 @@ log = get_logger(__name__)
 
 from app.core.config import settings
 from transcribe.utilities.o4_transcribe_diarized import transcript_audio_file_verbose_o4_diarize
-from app.transcribe.utlities.scenario_tools import async_detect_speaker_roles
+from app.transcribe.utilities.scenario_tools import async_detect_speaker_roles
 import re
 
 

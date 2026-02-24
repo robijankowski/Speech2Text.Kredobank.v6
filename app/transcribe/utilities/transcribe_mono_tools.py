@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple, Optional
 from app.core.config import settings
 from app.core.logger import log
 
-from app.transcribe.utlities.scenario_tools import (DiarSeg, 
+from app.transcribe.utilities.scenario_tools import (DiarSeg, 
                                                  _default_detect_speaker_role_model,
                                                  _default_transcription_model,
                                                  _default_split_into_roles_model)

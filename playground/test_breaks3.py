@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional
 from openai import OpenAI
 
 from app.core.config import settings
-from app.transcribe.utlities.audio_tools import split_stereo_to_lr_and_clean
+from app.transcribe.utilities.audio_tools import split_stereo_to_lr_and_clean
 
 ChannelSide = Literal["L", "R"]
 

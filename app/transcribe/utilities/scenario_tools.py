@@ -37,7 +37,7 @@ class Turn:
         if self.text_diar is None:
             self.text_diar = self.text
 
-from app.transcribe.utlities.stats import set_stats
+from app.transcribe.utilities.stats import set_stats
 from app.openai_tools.openai_token_utilities import num_tokens_from_text
 
 from app.openai_tools.openai_client_text import async_chat_completion, async_chat_completion_with_format
