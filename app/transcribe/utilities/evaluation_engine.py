@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -227,7 +228,7 @@ def _error_detail(*, chk: CheckDef, model: str, err: Exception) -> Dict[str, Any
 
 
 
-async def async_run_scheme(
+async def async_run_scheme1111111111(
     *,
     transcript_text: str,
     metadata: str,
@@ -343,6 +344,150 @@ async def async_run_scheme(
 
 
 
+async def async_run_scheme(
+    *,
+    transcript_text: str,
+    metadata: str,
+    scheme: SchemeDef,
+    model_override: Optional[str] = None,
+    prev_result: Optional[Dict[str, Any]] = None,
+    interrupts_analysis: Optional[Dict[str, Any]] = None,
+    max_concurrent_checks: int = 0,   # <-- NEW (optional)
+) -> Tuple[Dict[str, Any], bool]:
+    """
+    Returns: (result, success)
 
+    success == True  -> all checks computed successfully, totals/percent calculated
+    success == False -> at least one check errored, totals/percent are NOT calculated
+                       (but already computed details are returned)
+    """
+    if not model_override:
+        model = _default_evaluation_model()
+    else:
+        model = model_override
+
+    if not max_concurrent_checks or max_concurrent_checks == 0:
+        max_concurrent_checks = settings.TR_SCORE_PARALLEL_REQUESTS
+         
+    scheme_checks: List[CheckDef] = list(scheme.checks)
+    scheme_ids = {c.id for c in scheme_checks}
+
+    # ingest prev_result details
+    prev_details_by_id: Dict[str, Dict[str, Any]] = {}
+    if isinstance(prev_result, dict):
+        prev_details = prev_result.get("details")
+        if isinstance(prev_details, list):
+            for item in prev_details:
+                if isinstance(item, dict):
+                    item_id = (item.get("id") or "").strip()
+                    if item_id in scheme_ids:
+                        prev_details_by_id[item_id] = item
+
+    # -------------------------
+    # NEW: concurrency-limited execution
+    # -------------------------
+    max_concurrent_checks = max(1, int(max_concurrent_checks or 10))
+    sem = asyncio.Semaphore(max_concurrent_checks)
+
+    async def _compute_one(chk: CheckDef) -> Dict[str, Any]:
+        async with sem:
+            try:
+                return await async_run_check(
+                    transcript_text=transcript_text,
+                    metadata=metadata,
+                    check=chk,
+                    model=model,
+                )
+            except Exception as e:
+                log.exception(
+                    "run_check failed: system=%s scheme=%s v%s check_id=%s model=%s",
+                    scheme.system_code, scheme.name, scheme.version, chk.id, model
+                )
+                return _error_detail(chk=chk, model=model, err=e)
+
+    reused_by_id: Dict[str, Dict[str, Any]] = {}
+    tasks_by_id: Dict[str, asyncio.Task] = {}
+
+    for chk in scheme_checks:
+        reused: Optional[Dict[str, Any]] = None
+        if chk.id in prev_details_by_id:
+            reused = _normalize_prev_detail(prev=prev_details_by_id[chk.id], chk=chk)
+
+        if reused is not None:
+            if not reused.get("model"):
+                reused["model"] = model
+            reused_by_id[chk.id] = reused
+        else:
+            tasks_by_id[chk.id] = asyncio.create_task(_compute_one(chk))
+
+    computed_by_id: Dict[str, Dict[str, Any]] = {}
+    if tasks_by_id:
+        computed = await asyncio.gather(*tasks_by_id.values())
+        for rec in computed:
+            rid = (rec.get("id") or "").strip()
+            if rid:
+                computed_by_id[rid] = rec
+
+    # -------------------------
+    # Rebuild details in original order + totals
+    # -------------------------
+    details: List[Dict[str, Any]] = []
+    partial_weighted = 0.0
+    partial_weighted_max = 0.0
+
+    if interrupts_analysis:
+        details.append(interrupts_analysis)
+        ws = interrupts_analysis.get("weighted_score")
+        wm = interrupts_analysis.get("weighted_max")
+        if isinstance(ws, (int, float)) and isinstance(wm, (int, float)):
+            partial_weighted += float(ws)
+            partial_weighted_max += float(wm)
+
+    for chk in scheme_checks:
+        rec = reused_by_id.get(chk.id) or computed_by_id.get(chk.id)
+        if rec is None:
+            # Should not happen, but keep it explicit and mark as error
+            rec = _error_detail(chk=chk, model=model, err=RuntimeError("No result produced for this check"))
+        details.append(rec)
+
+        ws = rec.get("weighted_score")
+        wm = rec.get("weighted_max")
+        if isinstance(ws, (int, float)) and isinstance(wm, (int, float)):
+            partial_weighted += float(ws)
+            partial_weighted_max += float(wm)
+
+    had_error = any(
+        isinstance(r, dict) and (r.get("status") or "").lower() == "error"
+        for r in details
+        if (r.get("id") or "").strip() in scheme_ids
+    )
+
+    result: Dict[str, Any] = {
+        "system_code": scheme.system_code,
+        "scheme_name": scheme.name,
+        "scheme_version": scheme.version,
+        "model": model,
+        "details": details,
+
+        # helpful diagnostics even on failure
+        "had_error": had_error,
+        "partial_weighted_score": partial_weighted,
+        "partial_weighted_max": partial_weighted_max,
+    }
+
+    result["score_percent"] = None
+    if had_error:
+        result["total_weighted_score"] = None
+        result["total_weighted_max"] = None
+        result["score_percent"] = None
+        return result, False
+
+    result["total_weighted_score"] = partial_weighted
+    result["total_weighted_max"] = partial_weighted_max
+
+    if scheme.normalized_percent and partial_weighted_max > 0:
+        result["score_percent"] = round(partial_weighted / partial_weighted_max * 100.0, 2)
+
+    return result, True
 
 

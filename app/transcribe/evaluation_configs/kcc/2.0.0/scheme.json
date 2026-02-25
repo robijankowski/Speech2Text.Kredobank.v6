@@ -28,7 +28,7 @@
     "checks/MANIPULATION_misleading_phrases_level.json"
   ],
   "checks": [
-    "checks/MANIPULATION_misleading_phrases_level.json"
+    "checks/1_01_agent_greeting.json"
 ],
   "conditional_checks": {
     "FINPHONEYES": [

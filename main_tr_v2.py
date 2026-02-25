@@ -172,28 +172,15 @@ async def async_run_transcription(start_index=0, end_index=None):
 
 
             
-            log.info("\n\n" + "=" * 60 + f"\nRunning transcription for file name: '{audio_file}'\n")
             turns, scenario = await async_transcribe_audio_file_to_scenario_pipeline( source_file=audio_file,
                                                           temp_root_dir=settings.TR_TEMP_ROOT_DIR,
                                                           metadata=metadata_json 
                                                           )
-            log.info(f"\n=== Final scenario for file: {audio_file} ===\n{str(scenario)}")
             
-
-                        
-            log.info("\n\n" + "=" * 60 + f"\nRunning summary for file name: '{audio_file}'\n")
             summary = await async_generate_scenario_summary_pipeline(scenario=scenario)
-            log.info(f"Summary for file number {audio_file} :\n{json.dumps(summary, ensure_ascii=False, indent=2)}")
 
-
-
-            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation interrupts file name: '{audio_file}'\n")
             res_interrupts = await async_evaluate_conversation_interrupts_pipeline(diar_segs_turns=turns) 
-            log.info(f"Evaluation interrupts result {audio_file} :\n{json.dumps(res_interrupts, ensure_ascii=False, indent=2)}")
 
-
-
-            log.info("\n\n" + "=" * 60 + f"\nRunning evaluation for file name: '{audio_file}'\n")
             res, success = await async_evaluate_transcripted_scenario_pipeline( scenario=scenario,
                                                                     metadata=metadata_json,
                                                                     system_code=SYSTEM_CODE,
@@ -202,20 +189,12 @@ async def async_run_transcription(start_index=0, end_index=None):
                                                                     prev_result=None,
                                                                     interrupts_analysis=res_interrupts
                                                                     )
-            log.info(f"Evaluation results {audio_file} :\n{success}\nResult: {json.dumps(res, ensure_ascii=False, indent=2)}")
 
-
-
-            log.info("\n\n" + "=" * 60 + f"\nRunning async analysis for  file name: '{audio_file}'\n")
-            request = json.loads(SAMPLE_REQUEST_JSON) #simluation of phase 2 - analysis on free questions
+            #simluation of phase 2 - analysis on free questions
+            request = json.loads(SAMPLE_REQUEST_JSON) 
             request["conversation"] = scenario
             res, success = await async_run_analysis_of_the_transcription_pipeline(request_json=request, prev_result=None)
-            log.info(f"SUCCESS: {success}")
-            for a in res["answers"]:
-                log.info(f'{a["questionId"]}: {a["status"]} -> {a.get("answer")}')
 
-            log.info(json.dumps(res, ensure_ascii=False, indent=2))
-                  
             
             file_number += 1
 

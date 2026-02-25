@@ -35,6 +35,8 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
       - If stereo and not force_mono -> use your existing stereo pipeline
       - Else -> mono pipeline above
     """
+    log.info("\n\n" + "="*20 + f" Starting transcription of the file: '{source_file}' " + "="*20)
+
     temp_root_dir = settings.TR_TEMP_ROOT_DIR
 
     diar_segs_turns, scenario = await async_transcribe_stereo_hq_roles_to_turns_v2(source_file=source_file,
@@ -42,6 +44,7 @@ async def async_transcribe_audio_file_to_scenario_pipeline(
                                                                             metadata=metadata 
                                                                             )
                                                                 
+    log.info(f"\n\nFINAL RESULT - SCENARIO FROM THE TRANSCRIPTION OF: '{source_file}':\n\n" + str(scenario) + "\n")
     return diar_segs_turns, scenario 
 
 
@@ -53,10 +56,9 @@ async def async_generate_scenario_summary_pipeline(
     scenario: str, 
     model_override: str = None) -> str:
       
-    log.info("\n\n\n" + "="*30 + " Generating summary " + "="*30)
-    # summary = await async_generate_crm_summary_for_call_scenario(scenario, model=model_override)
+    log.info("\n\n" + "="*20 + " Starting generation of the summary " + "="*20)
     summary = await async_generate_crm_summary_for_call_scenario_ext(scenario, model=model_override)
-    log.info("\n" + json.dumps(summary, ensure_ascii=False, indent=2))
+    log.info("\n\nFINAL RESULT - SUMMARY\n\n" + json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
     return json.dumps(summary, ensure_ascii=False, indent=2)
 
 
@@ -75,7 +77,11 @@ async def async_evaluate_conversation_interrupts_pipeline(
     This is intentionally model-free (deterministic), but keeps the `model` field
     for downstream compatibility.
     """
+
+    log.info("\n\n" + "="*20 + " Starting interrupts analysis " + "="*20)
+
     if not settings.TR_EVALUATE_INTERRUPTS == "Y":
+        log.info(f"Interrupts analysis canceled due to: settings.TR_EVALUATE_INTERRUPTS = '{settings.TR_EVALUATE_INTERRUPTS}'")
         return None
     
 
@@ -129,7 +135,7 @@ async def async_evaluate_conversation_interrupts_pipeline(
     model_label = model_override or "rules"
 
 
-    return {
+    res = {
         "id": "2_03_conversation_interrupts",
         "desc": "Conversation overlaps / interruptions (LR timestamped, rule-based)",
         "score": int(score),
@@ -142,8 +148,12 @@ async def async_evaluate_conversation_interrupts_pipeline(
             "overlaps": overlaps_res["overlaps"],
             "events": overlaps_res["events"],
             "stats": overlaps_res["stats"],
-        },
+        }
     }
+
+    log.info(f"\n\nFINAL RESULT - THE INTERRUPTS ANALYSIS:\n\n" + json.dumps(res, ensure_ascii=False, indent=2) + "\n")
+    return res
+    
 
 
 
@@ -159,6 +169,8 @@ async def async_evaluate_transcripted_scenario_pipeline(
     model_override: Optional[str] = None,
     interrupts_analysis: Optional[Dict[str, Any]] = None,
 ):      
+    log.info("\n\n" + "="*20 + " Starting call scoring calculations " + "="*20)
+
     # run_scheme expects metadata to be a string (it calls `.strip()` in prompts)
     if metadata is None:
         metadata_text = ""
@@ -171,10 +183,11 @@ async def async_evaluate_transcripted_scenario_pipeline(
         except Exception:
             metadata_text = str(metadata)
 
-    log.info("\n\n" + "=" * 30 + "\nLoading current evaluation scheme " + "=" * 30)
+    config_root = settings.TR_EVALUATION_CONFIGS_ROOT
+    log.info(f"Loading current evaluation scheme for system: '{system_code}' from: '{config_root}' ")
 
     scheme = load_active_scheme(
-        config_root=settings.TR_EVALUATION_CONFIGS_ROOT,
+        config_root=config_root,
         system_code=system_code,
         call_date=call_date,
         call_info=call_info,
@@ -182,12 +195,17 @@ async def async_evaluate_transcripted_scenario_pipeline(
     )
 
 
-    log.info(f"\nUsing scheme: {scheme.system_code} v{scheme.version}\n")
+    log.info(f"Using scheme: '{scheme.system_code}' v{scheme.version} from config root: '{config_root}'")
     log.debug(
-        f"\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        f"Scoring will be called with following parameters:"
+        f"\n\nConfiguration:\n{json.dumps(asdict(scheme), indent=2, ensure_ascii=False)}"
+        f"\n\nCall info:\n{json.dumps(call_info, indent=2, ensure_ascii=False)}"
+        f"\n\nMetadata:\n{metadata}"
+        f"\n\nPrevResult:\n{json.dumps(prev_result, indent=2, ensure_ascii=False)}"
+        f"\n\nScenario:\n{scenario}\n"
     )
 
-    log.info("\n\n" + "=" * 30 + "\nRunning evaluation scheme " + "=" * 30)
+    log.info(f"Starting to run evaluation scheme for: '{scheme.system_code}' v{scheme.version} from config root: '{config_root}'")
     result, success = await async_run_scheme(
         transcript_text=scenario,
         metadata=metadata_text,
@@ -196,6 +214,8 @@ async def async_evaluate_transcripted_scenario_pipeline(
         prev_result=prev_result,
         interrupts_analysis=interrupts_analysis
     )
+
+    log.info(f"\n\nFINAL RESULT - THE SCORE CALCULATIONS:\n\nSuccess indicator: '{success}'\nResult data:" + json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 
     return result, success
 
@@ -211,6 +231,8 @@ async def async_run_analysis_of_the_transcription_pipeline(
     timeout: float = 120.0,
 ) -> Tuple[Dict[str, Any], bool]:
     
+    log.info("\n\n" + "="*20 + " Starting scenario daily/night batch analysis " + "="*20)
+
     result, success = await async_analyze_transcription_questions(
         request_json=request_json,
         model=model_override,
@@ -218,4 +240,11 @@ async def async_run_analysis_of_the_transcription_pipeline(
         prev_result=prev_result,
         timeout=timeout,
     )
+    res_info_text = ""
+    for a in result["answers"]:
+        res_info_text += f'{a["questionId"]}: {a["status"]} -> {a.get("answer")}\n'
+    log.info(f"\n\nFINAL RESULT - THE SCENARIO DAILY/NIGHT BATCH ANALYSIS:"
+             f"\n\nSUCCESS indicator: '{success}"
+             f"\n\nQuestions status:\n{res_info_text}"
+             "\nResult json data:\n" + json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return result, success

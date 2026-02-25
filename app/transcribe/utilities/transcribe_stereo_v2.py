@@ -143,7 +143,7 @@ async def async_transcribe_stereo_hq_roles_to_turns_v2(
         f"Known entities canonical names: {meta}\n"
     )
 
-    log.info(f"\n\nPrompt for transcribe:\n{prompt}\n")
+    log.info(f"\n\nTRANSCRIBING - Prompt for transcribe:\n{prompt}\n")
 
     # 1) diarize whole file
     diar, hq = await asyncio.gather(
@@ -164,34 +164,34 @@ async def async_transcribe_stereo_hq_roles_to_turns_v2(
         ),
     )
 
-    log.info(f"\n\nResult of transcribe:\n{str(hq)}\n")
-    log.info(f"\n\nResult of transcribe diarize:\n{str(diar)}\n")
+    log.info(f"\n\nTRANSCRIBING - Result of transcribe:\n{str(hq)}\n")
+    log.info(f"\n\nTRANSCRIBING - Result of transcribe diarize:\n{str(diar)}\n")
 
     diar_segs = diar.segments
     hq_text = hq.text
 
     diar_segs_speaker_map = await async_classify_all_speakers_agent_or_client(diar_segs)
-    log.info(f"\n\nSpeakers mapping on diarized segs:\n{diar_segs_speaker_map}\n")
+    log.info(f"\n\nROLE MAPPING - Speakers mapping on diarized segs:\n{diar_segs_speaker_map}\n")
 
     diar_segs_turns = remap_diar_speakers_to_turns(segs=diar_segs, 
                                                    speaker_map=diar_segs_speaker_map, 
                                                    file=cleaned_source_file)
     diar_segs_turns_log_info = render_timestamped_script_from_turns(diar_segs_turns)
-    log.info(f"\n\nFormatted turns from diarized segs:\n{diar_segs_turns_log_info}\n")  
+    log.info(f"\n\nROLE MAPPING - Formatted turns from diarized segs:\n{diar_segs_turns_log_info}\n")  
 
     
     diar_segs_scenario = render_timestamped_script_from_turns(diar_segs_turns, timestamp_on=False)
-    log.info(f"\n\nFormatted scenario based on diarized segs to be corrected by LLM:\n{diar_segs_scenario}\n")  
-    log.info(f"\n\nHQ Text to be used by LLM to correct scenario based on diarized segs:\n{hq_text}\n")  
+    log.info(f"\n\nSCENARIO FIXING - Formatted scenario based on diarized segs to be corrected by LLM:\n{diar_segs_scenario}\n")  
+    log.info(f"\n\nSCENARIO FIXING - HQ Text to be used by LLM to correct scenario based on diarized segs:\n{hq_text}\n")  
 
     scenario_corrected = await async_correct_diarized_scenario_with_hq_text(
         scenario_with_roles = diar_segs_scenario,
         hq_text = hq_text
     )
-    log.info(f"\n\nScenario corrected by LLM:\n{scenario_corrected}\n")
+    log.info(f"\n\nSCENARIO FIXING - RESULT - Scenario corrected by LLM:\n{scenario_corrected}\n")
 
     diar_segs_turns_log_info = render_timestamped_script_from_turns(diar_segs_turns)
-    log.info(f"\n\nFormatted turns from diarized segs before pre-process for interrupts:\n{diar_segs_turns_log_info}\n")  
+    log.info(f"\n\nPREP FOR INTERRUPTS - Formatted turns from diarized segs before pre-process for interrupts:\n{diar_segs_turns_log_info}\n")  
     turns_for_interrupts = preprocess_turns_for_interrupts_analysis(
         diar_segs_turns,
         merge_gap_ms_ag=500,
@@ -199,7 +199,7 @@ async def async_transcribe_stereo_hq_roles_to_turns_v2(
         drop_backchannels=True,
     )
     interrupts_turns_log_info = render_timestamped_script_from_turns(turns_for_interrupts)
-    log.info(f"\n\nFormatted turns from diarized segs for interrupts:\n{interrupts_turns_log_info}\n")  
+    log.info(f"\n\nPREP FOR INTERRUPTS - Formatted turns from diarized segs for interrupts:\n{interrupts_turns_log_info}\n")  
 
     return turns_for_interrupts, scenario_corrected
 

@@ -90,6 +90,7 @@ class AppSettings(BaseSettings):
 
     TR_EVALUATION_CONFIGS_ROOT: str
 
+    TR_SCORE_PARALLEL_REQUESTS: int
     TR_ANALYSIS_PARALLEL_REQUESTS: int
 
     TR_EVALUATE_INTERRUPTS: str

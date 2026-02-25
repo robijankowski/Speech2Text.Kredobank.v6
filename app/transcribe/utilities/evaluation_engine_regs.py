@@ -90,13 +90,13 @@ def resolve_scheme_path(
     metas = list_schemes_for_system(config_root, system_code)
 
     if not metas:
-        raise FileNotFoundError(f"No scheme.json found for system_code={system_code}")
+        raise FileNotFoundError(f"No scheme.json found for system_code={system_code} in config root='{config_root}'")
 
     if version:
         for m in metas:
             if m.version == version:
                 return m.scheme_path
-        raise FileNotFoundError(f"No scheme.json for system_code={system_code} version={version}")
+        raise FileNotFoundError(f"No scheme.json for system_code={system_code} version={version} in config root='{config_root}'")
 
     # pick schemes whose validity window contains call_date
     candidates = []
@@ -105,7 +105,7 @@ def resolve_scheme_path(
             candidates.append(m)
 
     if not candidates:
-        raise ValueError(f"No active scheme for system_code={system_code} on {call_date.isoformat()}")
+        raise ValueError(f"No active scheme for system_code={system_code} on {call_date.isoformat()} in config root='{config_root}'")
 
     # NEW: pick latest valid_from, then highest version within that valid_from
     latest_vf = max(m.valid_from for m in candidates)
